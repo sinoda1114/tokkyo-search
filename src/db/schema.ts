@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { sqliteTable, text, integer, primaryKey } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, primaryKey, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 const timestamps = {
   createdAt: integer("created_at", { mode: "timestamp" })
@@ -34,17 +34,29 @@ export type SearchTermType = (typeof searchTermTypeValues)[number];
 export const searchTermSourceValues = ["user", "llm", "analysis"] as const;
 export type SearchTermSource = (typeof searchTermSourceValues)[number];
 
-export const searchTerms = sqliteTable("search_terms", {
-  id: text("id").primaryKey(),
-  caseId: text("case_id")
-    .notNull()
-    .references(() => cases.id, { onDelete: "cascade" }),
-  parentTermId: text("parent_term_id"),
-  termType: text("term_type").$type<SearchTermType>().notNull(),
-  text: text("text").notNull(),
-  source: text("source").$type<SearchTermSource>().notNull().default("user"),
-  createdAt: timestamps.createdAt,
-});
+export const searchTerms = sqliteTable(
+  "search_terms",
+  {
+    id: text("id").primaryKey(),
+    caseId: text("case_id")
+      .notNull()
+      .references(() => cases.id, { onDelete: "cascade" }),
+    parentTermId: text("parent_term_id"),
+    termType: text("term_type").$type<SearchTermType>().notNull(),
+    text: text("text").notNull(),
+    source: text("source").$type<SearchTermSource>().notNull().default("user"),
+    createdAt: timestamps.createdAt,
+  },
+  (table) => [
+    // 同一案件・同一タイプで同じ語を重複登録しないための制約。
+    // 追加系Server Actionはこれを前提に `onConflictDoNothing()` で重複を無視する。
+    uniqueIndex("search_terms_case_id_term_type_text_unique").on(
+      table.caseId,
+      table.termType,
+      table.text,
+    ),
+  ],
+);
 
 export const searchRunStatusValues = ["success", "error"] as const;
 export type SearchRunStatus = (typeof searchRunStatusValues)[number];

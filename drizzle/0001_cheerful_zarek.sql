@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX `search_terms_case_id_term_type_text_unique` ON `search_terms` (`case_id`,`term_type`,`text`);
