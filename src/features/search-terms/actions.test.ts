@@ -6,7 +6,11 @@ vi.mock("@/db/client", async () => {
   return { db: testDb };
 });
 
-import { addSearchTerms, saveSelectedExpansions } from "@/features/search-terms/actions";
+import {
+  addResearchTerms,
+  addSearchTerms,
+  saveSelectedExpansions,
+} from "@/features/search-terms/actions";
 import { db } from "@/db/client";
 import { cases, searchTerms } from "@/db/schema";
 import { eq } from "drizzle-orm";
@@ -99,5 +103,41 @@ describe("saveSelectedExpansions", () => {
     const result = await saveSelectedExpansions("case-7", []);
 
     expect(result.insertedCount).toBe(0);
+  });
+});
+
+describe("addResearchTerms", () => {
+  it("AI解析結果から選択された語を source: analysis として保存する", async () => {
+    await seedCase("case-8");
+
+    await addResearchTerms("case-8", [
+      { termType: "synonym", text: "特徴的な用語A" },
+      { termType: "broader", text: "再検索候補B" },
+    ]);
+
+    const rows = await db.select().from(searchTerms).where(eq(searchTerms.caseId, "case-8"));
+    expect(rows).toHaveLength(2);
+    expect(rows.every((r) => r.source === "analysis")).toBe(true);
+    const broaderRow = rows.find((r) => r.termType === "broader");
+    expect(broaderRow?.text).toBe("再検索候補B");
+  });
+
+  it("同一案件・同一タイプ・同一テキストの重複は無視する", async () => {
+    await seedCase("case-9");
+    await addResearchTerms("case-9", [{ termType: "synonym", text: "重複語" }]);
+
+    await addResearchTerms("case-9", [{ termType: "synonym", text: "重複語" }]);
+
+    const rows = await db.select().from(searchTerms).where(eq(searchTerms.caseId, "case-9"));
+    expect(rows).toHaveLength(1);
+  });
+
+  it("入力が空配列のとき何も保存しない（DBに触れずエラーにもならない）", async () => {
+    await seedCase("case-10");
+
+    await addResearchTerms("case-10", []);
+
+    const rows = await db.select().from(searchTerms).where(eq(searchTerms.caseId, "case-10"));
+    expect(rows).toHaveLength(0);
   });
 });

@@ -83,3 +83,30 @@ export async function saveSelectedExpansions(
 
   return { insertedCount: inserted.length };
 }
+
+export interface ResearchTerm {
+  termType: SearchTermType;
+  text: string;
+}
+
+/**
+ * AI文献解析結果（特徴的用語・再検索候補・引用文献）からユーザーが選んだ語を
+ * termType: 呼び出し側が決めたタイプ, source: "analysis" として一括保存する。
+ * 重複（同一案件・同一タイプ・同一テキスト）は無視する。
+ */
+export async function addResearchTerms(caseId: string, terms: ResearchTerm[]): Promise<void> {
+  if (terms.length === 0) {
+    return;
+  }
+
+  const { db } = await import("@/db/client");
+  const rows = terms.map((term) => ({
+    id: nanoid(),
+    caseId,
+    termType: term.termType,
+    text: term.text,
+    source: "analysis" as const,
+  }));
+
+  await db.insert(searchTerms).values(rows).onConflictDoNothing();
+}

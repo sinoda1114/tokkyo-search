@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Alert, Button, Chip, Heading, Paragraph, Spinner } from "@heroui/react";
 import type { AnalysisResult } from "@/lib/gemini/schemas";
+import { ResearchCandidatesPanel } from "./research-candidates-panel";
 
 type AnalysisState =
   | { status: "success"; result: AnalysisResult }
@@ -10,6 +11,7 @@ type AnalysisState =
   | null;
 
 interface AnalysisSectionProps {
+  caseId: string;
   patentId: string;
   initialAnalysis: AnalysisState;
 }
@@ -48,7 +50,7 @@ const AI_LIMITATION_NOTICE =
  * 未解析なら実行ボタンを表示し、`/api/patents/[patentId]/analysis` をPOSTして結果を取得する。
  * 既存の解析結果があれば `initialAnalysis` としてサーバーから渡され、即座に表示する。
  */
-export function AnalysisSection({ patentId, initialAnalysis }: AnalysisSectionProps) {
+export function AnalysisSection({ caseId, patentId, initialAnalysis }: AnalysisSectionProps) {
   const [analysis, setAnalysis] = useState<AnalysisState>(initialAnalysis);
   const [isLoading, setIsLoading] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
@@ -89,6 +91,7 @@ export function AnalysisSection({ patentId, initialAnalysis }: AnalysisSectionPr
         </div>
       ) : (
         <AnalysisBody
+          caseId={caseId}
           analysis={analysis}
           fetchError={fetchError}
           onRun={() => runAnalysis(false)}
@@ -100,13 +103,14 @@ export function AnalysisSection({ patentId, initialAnalysis }: AnalysisSectionPr
 }
 
 interface AnalysisBodyProps {
+  caseId: string;
   analysis: AnalysisState;
   fetchError: string | null;
   onRun: () => void;
   onRerun: () => void;
 }
 
-function AnalysisBody({ analysis, fetchError, onRun, onRerun }: AnalysisBodyProps) {
+function AnalysisBody({ caseId, analysis, fetchError, onRun, onRerun }: AnalysisBodyProps) {
   if (analysis === null) {
     return (
       <>
@@ -130,7 +134,14 @@ function AnalysisBody({ analysis, fetchError, onRun, onRerun }: AnalysisBodyProp
     );
   }
 
-  return <AnalysisResultView result={analysis.result} fetchError={fetchError} onRerun={onRerun} />;
+  return (
+    <AnalysisResultView
+      caseId={caseId}
+      result={analysis.result}
+      fetchError={fetchError}
+      onRerun={onRerun}
+    />
+  );
 }
 
 function ErrorAlert({ message }: { message: string }) {
@@ -144,12 +155,13 @@ function ErrorAlert({ message }: { message: string }) {
 }
 
 interface AnalysisResultViewProps {
+  caseId: string;
   result: AnalysisResult;
   fetchError: string | null;
   onRerun: () => void;
 }
 
-function AnalysisResultView({ result, fetchError, onRerun }: AnalysisResultViewProps) {
+function AnalysisResultView({ caseId, result, fetchError, onRerun }: AnalysisResultViewProps) {
   return (
     <div className="flex flex-col gap-4">
       <Alert status="warning">
@@ -175,6 +187,8 @@ function AnalysisResultView({ result, fetchError, onRerun }: AnalysisResultViewP
         items={result.searchCandidates.map((candidate) => `${candidate.type}: ${candidate.text}`)}
       />
       <TagListSection label="引用文献" items={result.citedReferences} />
+
+      <ResearchCandidatesPanel caseId={caseId} analysis={result} />
 
       <Button type="button" variant="secondary" size="sm" onPress={onRerun}>
         再実行

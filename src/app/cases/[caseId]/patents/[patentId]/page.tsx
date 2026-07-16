@@ -120,7 +120,7 @@ export default async function PatentDetailPage({ params }: PatentDetailPageProps
 
       <ClaimsSection patentId={patent.id} initialClaimsText={patent.claimsText} />
 
-      <AnalysisSection patentId={patent.id} initialAnalysis={initialAnalysis} />
+      <AnalysisSection caseId={caseId} patentId={patent.id} initialAnalysis={initialAnalysis} />
 
       <Link href={googlePatentsUrl} target="_blank" rel="noopener noreferrer">
         Google Patentsで開く
