@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { Link } from "@heroui/react";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -27,12 +28,12 @@ export default function RootLayout({ children }: Readonly<RootLayoutProps>) {
       lang="ja"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-slate-50 text-slate-900">
-        <header className="border-b border-slate-200 bg-white">
+      <body className="min-h-full flex flex-col bg-[var(--background)] text-[var(--foreground)]">
+        <header className="border-b border-[var(--border)] bg-[var(--surface)]">
           <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
-            <a href="/cases" className="text-lg font-semibold">
+            <Link href="/cases" className="text-lg font-semibold">
               Patent Search Assistant
-            </a>
+            </Link>
           </div>
         </header>
         <main className="mx-auto w-full max-w-5xl flex-1 px-6 py-8">
