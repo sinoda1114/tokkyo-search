@@ -3,7 +3,9 @@ import { Chip, Heading, Link, Paragraph } from "@heroui/react";
 import { getCaseById } from "@/features/cases/queries";
 import { getPatentById } from "@/features/patents/queries";
 import { buildGooglePatentsUrl } from "@/features/patents/google-patents-link";
+import { getAnalysisByPatentId } from "@/features/analysis/queries";
 import { ClaimsSection } from "./claims-section";
+import { AnalysisSection } from "./analysis-section";
 
 // 特許詳細は請求項キャッシュ更新等を反映するため force-dynamic（キャッシュしない）。
 export const dynamic = "force-dynamic";
@@ -29,6 +31,14 @@ export default async function PatentDetailPage({ params }: PatentDetailPageProps
   if (!patent) {
     notFound();
   }
+
+  const analysis = await getAnalysisByPatentId(patent.id);
+  const initialAnalysis =
+    analysis && analysis.status === "success" && analysis.result
+      ? { status: "success" as const, result: analysis.result }
+      : analysis && analysis.status === "error"
+        ? { status: "error" as const, errorMessage: analysis.errorMessage ?? "解析に失敗しました" }
+        : null;
 
   const googlePatentsUrl = buildGooglePatentsUrl(patent.publicationNumber);
 
@@ -109,6 +119,8 @@ export default async function PatentDetailPage({ params }: PatentDetailPageProps
       </section>
 
       <ClaimsSection patentId={patent.id} initialClaimsText={patent.claimsText} />
+
+      <AnalysisSection patentId={patent.id} initialAnalysis={initialAnalysis} />
 
       <Link href={googlePatentsUrl} target="_blank" rel="noopener noreferrer">
         Google Patentsで開く

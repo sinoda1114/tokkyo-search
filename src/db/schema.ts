@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import { sqliteTable, text, integer, primaryKey, uniqueIndex } from "drizzle-orm/sqlite-core";
+import type { AnalysisResult } from "@/lib/gemini/schemas";
 
 const timestamps = {
   createdAt: integer("created_at", { mode: "timestamp" })
@@ -158,7 +159,7 @@ export const patentAnalyses = sqliteTable("patent_analyses", {
     .references(() => patents.id, { onDelete: "cascade" }),
   model: text("model").notNull(),
   promptVersion: text("prompt_version").notNull(),
-  result: text("result", { mode: "json" }),
+  result: text("result", { mode: "json" }).$type<AnalysisResult>(),
   status: text("status").$type<AnalysisStatus>().notNull(),
   errorMessage: text("error_message"),
   createdAt: timestamps.createdAt,
