@@ -5,6 +5,7 @@ import { getSearchTermsByCase } from "@/features/search-terms/queries";
 import { AddTermsForm } from "./add-terms-form";
 import { TermList } from "./term-list";
 import { ExpansionPanel } from "./expansion-panel";
+import { SearchExecutionPanel } from "./search-execution-panel";
 
 // 検索語は都度DBの最新状態を反映するため force-dynamic（キャッシュしない）。
 export const dynamic = "force-dynamic";
@@ -42,6 +43,8 @@ export default async function TermsPage({ params }: TermsPageProps) {
         originalTerms={originalTerms}
         technicalField={caseItem.technicalField}
       />
+
+      <SearchExecutionPanel caseId={caseId} termsByType={termsByType} />
     </div>
   );
 }
