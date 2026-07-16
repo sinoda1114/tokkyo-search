@@ -2,6 +2,8 @@ import { notFound } from "next/navigation";
 import { Alert, Chip, Heading, Link, Paragraph } from "@heroui/react";
 import { getCaseById } from "@/features/cases/queries";
 import { getSearchResultsByRun, getSearchRunById } from "@/features/patent-search/queries";
+import { getCasePatentStatusesByCase } from "@/features/patents/evaluation-queries";
+import { EvaluationControl } from "./evaluation-control";
 
 // 検索結果は都度DBの最新状態を反映するため force-dynamic（キャッシュしない）。
 export const dynamic = "force-dynamic";
@@ -64,6 +66,8 @@ export default async function SearchRunPage({ params }: SearchRunPageProps) {
   }
 
   const results = await getSearchResultsByRun(runId);
+  const evaluations = await getCasePatentStatusesByCase(caseId);
+  const evaluationByPatentId = new Map(evaluations.map((row) => [row.patentId, row]));
 
   return (
     <div className="flex flex-col gap-6">
@@ -115,6 +119,13 @@ export default async function SearchRunPage({ params }: SearchRunPageProps) {
                   ))}
                 </div>
               ) : null}
+              <EvaluationControl
+                caseId={caseId}
+                patentId={result.patentId}
+                initialStatus={evaluationByPatentId.get(result.patentId)?.status ?? "unrated"}
+                initialComment={evaluationByPatentId.get(result.patentId)?.comment}
+                initialExclusionReason={evaluationByPatentId.get(result.patentId)?.exclusionReason}
+              />
             </li>
           ))}
         </ol>

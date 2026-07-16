@@ -4,8 +4,10 @@ import { getCaseById } from "@/features/cases/queries";
 import { getPatentById } from "@/features/patents/queries";
 import { buildGooglePatentsUrl } from "@/features/patents/google-patents-link";
 import { getAnalysisByPatentId } from "@/features/analysis/queries";
+import { getCasePatentStatus } from "@/features/patents/evaluation-queries";
 import { ClaimsSection } from "./claims-section";
 import { AnalysisSection } from "./analysis-section";
+import { EvaluationSection } from "./evaluation-section";
 
 // 特許詳細は請求項キャッシュ更新等を反映するため force-dynamic（キャッシュしない）。
 export const dynamic = "force-dynamic";
@@ -32,6 +34,7 @@ export default async function PatentDetailPage({ params }: PatentDetailPageProps
     notFound();
   }
 
+  const evaluation = await getCasePatentStatus(caseId, patent.id);
   const analysis = await getAnalysisByPatentId(patent.id);
   const initialAnalysis =
     analysis && analysis.status === "success" && analysis.result
@@ -119,6 +122,14 @@ export default async function PatentDetailPage({ params }: PatentDetailPageProps
       </section>
 
       <ClaimsSection patentId={patent.id} initialClaimsText={patent.claimsText} />
+
+      <EvaluationSection
+        caseId={caseId}
+        patentId={patent.id}
+        initialStatus={evaluation?.status ?? "unrated"}
+        initialComment={evaluation?.comment}
+        initialExclusionReason={evaluation?.exclusionReason}
+      />
 
       <AnalysisSection caseId={caseId} patentId={patent.id} initialAnalysis={initialAnalysis} />
 

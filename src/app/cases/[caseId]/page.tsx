@@ -2,6 +2,15 @@ import { notFound } from "next/navigation";
 import { Heading, Link, Paragraph } from "@heroui/react";
 import { getCaseById } from "@/features/cases/queries";
 import { getSearchRunsByCase } from "@/features/patent-search/queries";
+import {
+  getEvaluatedPatentsByCase,
+  type EvaluatedPatentItem,
+} from "@/features/patents/evaluation-queries";
+import {
+  CASE_PATENT_STATUS_LABELS,
+  EVALUATED_STATUS_ORDER,
+} from "@/features/patents/evaluation-options";
+import type { CasePatentStatus } from "@/db/schema";
 import { CaseMemoEditor } from "./case-memo-editor";
 
 const BYTES_PER_GIB = 1024 ** 3;
@@ -13,6 +22,20 @@ function formatBytesBilled(bytes: number | null): string {
 
 function formatDateTime(value: Date): string {
   return value.toLocaleString("ja-JP");
+}
+
+/** 評価済み特許をstatus別（重要→参考→対象外）にグルーピングする。 */
+function groupByStatus(
+  items: EvaluatedPatentItem[],
+): Record<CasePatentStatus, EvaluatedPatentItem[]> {
+  const grouped = Object.fromEntries(
+    EVALUATED_STATUS_ORDER.map((status) => [status, [] as EvaluatedPatentItem[]]),
+  ) as Record<CasePatentStatus, EvaluatedPatentItem[]>;
+
+  for (const item of items) {
+    grouped[item.evaluation.status].push(item);
+  }
+  return grouped;
 }
 
 // 案件詳細は都度DBの最新状態を反映するため force-dynamic（キャッシュしない）。
@@ -31,6 +54,8 @@ export default async function CaseDetailPage({ params }: CaseDetailPageProps) {
   }
 
   const searchRuns = await getSearchRunsByCase(caseItem.id);
+  const evaluatedPatents = await getEvaluatedPatentsByCase(caseItem.id);
+  const evaluatedByStatus = groupByStatus(evaluatedPatents);
 
   return (
     <div className="flex flex-col gap-8">
@@ -72,6 +97,50 @@ export default async function CaseDetailPage({ params }: CaseDetailPageProps) {
               </li>
             ))}
           </ul>
+        )}
+      </section>
+
+      <section className="flex flex-col gap-3 rounded-[var(--radius)] border border-[var(--border)] p-4">
+        <Heading level={2}>評価済み特許</Heading>
+        {evaluatedPatents.length === 0 ? (
+          <Paragraph color="muted">評価済みの特許はまだありません。</Paragraph>
+        ) : (
+          <div className="flex flex-col gap-4">
+            {EVALUATED_STATUS_ORDER.map((status) => (
+              <div key={status} className="flex flex-col gap-2">
+                <Heading level={3}>
+                  {CASE_PATENT_STATUS_LABELS[status]}（{evaluatedByStatus[status].length}件）
+                </Heading>
+                {evaluatedByStatus[status].length === 0 ? (
+                  <Paragraph size="sm" color="muted">
+                    該当する特許はありません。
+                  </Paragraph>
+                ) : (
+                  <ul className="flex flex-col gap-2">
+                    {evaluatedByStatus[status].map(({ patent, evaluation }) => (
+                      <li
+                        key={patent.id}
+                        className="flex flex-col gap-1 rounded-[var(--radius)] border border-[var(--border)] p-3 text-sm"
+                      >
+                        <Link href={`/cases/${caseItem.id}/patents/${patent.id}`}>
+                          {patent.title ?? patent.publicationNumber}
+                        </Link>
+                        <Paragraph size="sm" color="muted">
+                          {patent.publicationNumber}
+                        </Paragraph>
+                        {evaluation.status === "excluded" && evaluation.exclusionReason ? (
+                          <Paragraph size="sm">対象外理由: {evaluation.exclusionReason}</Paragraph>
+                        ) : null}
+                        {evaluation.comment ? (
+                          <Paragraph size="sm">コメント: {evaluation.comment}</Paragraph>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            ))}
+          </div>
         )}
       </section>
     </div>
