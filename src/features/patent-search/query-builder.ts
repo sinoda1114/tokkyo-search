@@ -23,8 +23,8 @@ const SEARCH_COLUMNS = [
   "title_ja",
   "abstract_ja",
   "assignees",
-  "ipc_codes",
-  "cpc_codes",
+  "ARRAY(SELECT DISTINCT c FROM UNNEST(ipc_codes) AS c) AS ipc_codes",
+  "ARRAY(SELECT DISTINCT c FROM UNNEST(cpc_codes) AS c) AS cpc_codes",
   "cited_publications",
 ] as const;
 
