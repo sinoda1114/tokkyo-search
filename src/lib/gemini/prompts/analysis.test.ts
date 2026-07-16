@@ -47,6 +47,14 @@ describe("buildAnalysisPrompt", () => {
     expect(prompt).toMatch(/JSON/);
   });
 
+  it("searchCandidatesを短い語に限定する制約とtypeの許容値を明記する", () => {
+    const prompt = buildAnalysisPrompt(basePatent);
+    expect(prompt).toContain("単語・短いフレーズ");
+    for (const type of ["synonym", "broader", "narrower", "material", "function", "effect", "english"]) {
+      expect(prompt).toContain(type);
+    }
+  });
+
   it("抽出項目をすべて含む", () => {
     const prompt = buildAnalysisPrompt(basePatent);
     for (const field of [

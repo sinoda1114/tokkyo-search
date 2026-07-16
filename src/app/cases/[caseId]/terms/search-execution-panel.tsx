@@ -46,7 +46,6 @@ export function SearchExecutionPanel({ caseId, termsByType }: SearchExecutionPan
   const [selectedTermIds, setSelectedTermIds] = useState<Set<string>>(new Set());
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
-  const [searchClaims, setSearchClaims] = useState(false);
   const [assignee, setAssignee] = useState("");
   const [ipcPrefix, setIpcPrefix] = useState("");
   const [submitState, setSubmitState] = useState<SubmitState>({ status: "idle" });
@@ -87,7 +86,6 @@ export function SearchExecutionPanel({ caseId, termsByType }: SearchExecutionPan
           termIds: Array.from(selectedTermIds),
           dateFrom,
           dateTo,
-          searchClaims,
           assignee: assignee.trim() || undefined,
           ipcPrefix: ipcPrefix.trim() || undefined,
         }),
@@ -185,15 +183,6 @@ export function SearchExecutionPanel({ caseId, termsByType }: SearchExecutionPan
         <Label>IPC前方一致（任意）</Label>
         <Input placeholder="例: H01L" />
       </TextField>
-
-      <Checkbox isSelected={searchClaims} onChange={setSearchClaims}>
-        <Checkbox.Content>
-          <Checkbox.Control>
-            <Checkbox.Indicator />
-          </Checkbox.Control>
-          <Label>請求項も検索対象に含める</Label>
-        </Checkbox.Content>
-      </Checkbox>
 
       {submitState.status === "error" ? (
         <Alert status="danger">

@@ -53,8 +53,8 @@ export const expansionResponseSchema: Schema = {
 };
 
 export const analysisSearchCandidateSchema = z.object({
-  type: z.string().min(1),
-  text: z.string().min(1),
+  type: expansionTermTypeSchema,
+  text: z.string().min(1).max(40),
 });
 
 export const analysisResultSchema = z.object({
@@ -84,7 +84,7 @@ export const analysisResponseSchema: Schema = {
       items: {
         type: Type.OBJECT,
         properties: {
-          type: { type: Type.STRING },
+          type: { type: Type.STRING, enum: [...expansionTermTypeValues] },
           text: { type: Type.STRING },
         },
         required: ["type", "text"],

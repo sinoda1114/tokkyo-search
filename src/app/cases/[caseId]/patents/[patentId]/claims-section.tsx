@@ -41,7 +41,11 @@ export function ClaimsSection({ patentId, initialClaimsText }: ClaimsSectionProp
       ) : hasFetched ? (
         <Alert status="warning">
           <Alert.Content>
-            <Alert.Description>請求項データが見つかりませんでした。</Alert.Description>
+            <Alert.Description>
+              請求項データが見つかりませんでした。データソース（Google Patents Public
+              Data）に日本国特許の請求項全文が収録されていないためです（要約は別途取得済み）。全文は下部の「Google
+              Patentsで開く」リンクから確認できる場合があります。
+            </Alert.Description>
           </Alert.Content>
         </Alert>
       ) : (

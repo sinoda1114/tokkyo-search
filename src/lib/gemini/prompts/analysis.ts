@@ -35,6 +35,11 @@ ${claimsText}
 - searchCandidates: 再検索に使える候補語（type と text の組）
 - citedReferences: 本文中に記載された引用文献・参考文献のリスト
 
+searchCandidates の作成ルール（厳守）:
+- text は特許検索の検索語として使える**単語・短いフレーズのみ**とし、20文字以内を目安とすること。文や節（「〜を提供する」「〜と、〜とを備え」等）をそのまま抜き出さないこと。
+- type は次のいずれかとすること: synonym（類義語）, broader（上位概念）, narrower（下位概念）, material（材質）, function（機能）, effect（効果）, english（英語表現）。
+- overview・problem・solution 等の項目名や文章全体を type・text にそのまま転記しないこと。
+
 厳守事項:
 - 提供された本文に明記されている内容のみを根拠とすること。本文から特定できない項目は null とすること（keyTerms・searchCandidates・citedReferences に該当がない場合は空配列とすること）。
 - 特許性・新規性・進歩性の評価や断定を一切行わないこと。

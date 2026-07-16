@@ -81,4 +81,32 @@ describe("analysisResultSchema", () => {
     });
     expect(result.success).toBe(false);
   });
+
+  it("searchCandidatesのtypeが許容値以外の場合を拒否する", () => {
+    const result = analysisResultSchema.safeParse({
+      overview: null,
+      background: null,
+      problem: null,
+      solution: null,
+      effect: null,
+      keyTerms: [],
+      searchCandidates: [{ type: "problem", text: "候補" }],
+      citedReferences: [],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("searchCandidatesのtextが長すぎる場合を拒否する", () => {
+    const result = analysisResultSchema.safeParse({
+      overview: null,
+      background: null,
+      problem: null,
+      solution: null,
+      effect: null,
+      keyTerms: [],
+      searchCandidates: [{ type: "synonym", text: "あ".repeat(41) }],
+      citedReferences: [],
+    });
+    expect(result.success).toBe(false);
+  });
 });
