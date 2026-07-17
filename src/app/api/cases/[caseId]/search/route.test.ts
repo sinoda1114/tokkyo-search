@@ -16,6 +16,7 @@ vi.mock("@/features/cases/queries", () => ({
 import { POST } from "./route";
 import { BigQueryCostLimitError } from "@/lib/bigquery/cost-guard";
 import { SearchValidationError } from "@/features/patent-search/errors";
+import { resetRateLimitStoreForTests } from "@/lib/rate-limit";
 
 function buildRequest(body: unknown): Request {
   return new Request("http://localhost/api/cases/case-1/search", {
@@ -33,6 +34,7 @@ beforeEach(() => {
   runSearchMock.mockReset();
   getCaseByIdMock.mockReset();
   getCaseByIdMock.mockResolvedValue({ id: "case-1" });
+  resetRateLimitStoreForTests();
 });
 
 describe("POST /api/cases/[caseId]/search", () => {
@@ -203,5 +205,22 @@ describe("POST /api/cases/[caseId]/search", () => {
     );
 
     expect(response.status).toBe(500);
+  });
+
+  it("同一IPからの短時間の連続リクエストが上限を超えた場合、429を返しrunSearchを呼ばない", async () => {
+    const buildLimitRequest = () =>
+      buildRequest({ termIds: ["term-1"], dateFrom: "2000-01-01", dateTo: "2024-12-31" });
+
+    // 検索エンドポイントの上限（1分間に5回）まではrunSearchが呼ばれる。
+    for (let i = 0; i < 5; i += 1) {
+      runSearchMock.mockResolvedValueOnce({ searchRunId: `run-${i}`, resultCount: 0, bytesBilled: 0 });
+      const okResponse = await POST(buildLimitRequest(), buildContext("case-1"));
+      expect(okResponse.status).toBe(200);
+    }
+
+    const response = await POST(buildLimitRequest(), buildContext("case-1"));
+
+    expect(response.status).toBe(429);
+    expect(runSearchMock).toHaveBeenCalledTimes(5);
   });
 });

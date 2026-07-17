@@ -15,6 +15,7 @@ vi.mock("@/lib/gemini/client", () => ({
 
 import { POST } from "./route";
 import { GeminiRequestError, GeminiValidationError } from "@/lib/gemini/errors";
+import { resetRateLimitStoreForTests } from "@/lib/rate-limit";
 
 function buildRequest(body: unknown): Request {
   return new Request("http://localhost/api/cases/case-1/expansions", {
@@ -31,6 +32,7 @@ function buildContext(caseId: string) {
 beforeEach(() => {
   getCaseByIdMock.mockReset();
   generateExpansionMock.mockReset();
+  resetRateLimitStoreForTests();
 });
 
 describe("POST /api/cases/[caseId]/expansions", () => {
@@ -102,5 +104,21 @@ describe("POST /api/cases/[caseId]/expansions", () => {
     const response = await POST(request, buildContext("case-1"));
 
     expect(response.status).toBe(400);
+  });
+
+  it("同一IPからの短時間の連続リクエストが上限を超えた場合、429を返しgenerateExpansionを呼ばない", async () => {
+    getCaseByIdMock.mockResolvedValue({ id: "case-1", technicalField: null });
+    generateExpansionMock.mockResolvedValue({ terms: [] });
+
+    // 展開エンドポイントの上限（1分間に10回）まではgenerateExpansionが呼ばれる。
+    for (let i = 0; i < 10; i += 1) {
+      const okResponse = await POST(buildRequest({ terms: ["半導体"] }), buildContext("case-1"));
+      expect(okResponse.status).toBe(200);
+    }
+
+    const response = await POST(buildRequest({ terms: ["半導体"] }), buildContext("case-1"));
+
+    expect(response.status).toBe(429);
+    expect(generateExpansionMock).toHaveBeenCalledTimes(10);
   });
 });

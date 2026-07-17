@@ -4,9 +4,14 @@ import { getCaseById } from "@/features/cases/queries";
 import { runSearch } from "@/features/patent-search/search-service";
 import { SearchValidationError } from "@/features/patent-search/errors";
 import { BigQueryCostLimitError } from "@/lib/bigquery/cost-guard";
+import { RateLimitExceededError, checkRateLimit } from "@/lib/rate-limit";
+import { getRequestIp } from "@/lib/request-ip";
 
 // BigQuery呼び出しを伴うため常に動的に実行する（ビルド時の静的評価・キャッシュ対象にしない）。
 export const dynamic = "force-dynamic";
+
+// BigQueryはクエリごとに課金が発生するため、同一IPからの連打を抑制する。
+const SEARCH_RATE_LIMIT = { limit: 5, windowMs: 60_000 };
 
 // 空文字は「未指定」として扱う（フロントから `assignee: ""` 等が届いても400にしない）。
 const optionalNonEmptyString = z
@@ -38,6 +43,15 @@ function extractErrorMessage(error: unknown): string {
  * それ以外の予期しないエラーは500として返す。
  */
 export async function POST(request: Request, { params }: RouteContext): Promise<Response> {
+  try {
+    checkRateLimit(getRequestIp(request), SEARCH_RATE_LIMIT);
+  } catch (error: unknown) {
+    if (error instanceof RateLimitExceededError) {
+      return NextResponse.json({ error: error.message }, { status: 429 });
+    }
+    throw error;
+  }
+
   const { caseId } = await params;
 
   const caseItem = await getCaseById(caseId);

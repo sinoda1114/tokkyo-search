@@ -3,9 +3,14 @@ import { z } from "zod";
 import { getCaseById } from "@/features/cases/queries";
 import { generateExpansion } from "@/lib/gemini/client";
 import { GeminiRequestError, GeminiValidationError } from "@/lib/gemini/errors";
+import { RateLimitExceededError, checkRateLimit } from "@/lib/rate-limit";
+import { getRequestIp } from "@/lib/request-ip";
 
 // Gemini呼び出しを伴うため常に動的に実行する（ビルド時の静的評価・キャッシュ対象にしない）。
 export const dynamic = "force-dynamic";
+
+// Gemini呼び出しごとに課金が発生するため、同一IPからの連打を抑制する。
+const EXPANSIONS_RATE_LIMIT = { limit: 10, windowMs: 60_000 };
 
 const requestBodySchema = z.object({
   terms: z.array(z.string().trim().min(1)).min(1, "検索語を1件以上指定してください"),
@@ -20,6 +25,15 @@ interface RouteContext {
  * 実際のDB保存は行わない（UIがユーザーの選択を受けて `saveSelectedExpansions` を呼ぶ2段階UI）。
  */
 export async function POST(request: Request, { params }: RouteContext): Promise<Response> {
+  try {
+    checkRateLimit(getRequestIp(request), EXPANSIONS_RATE_LIMIT);
+  } catch (error: unknown) {
+    if (error instanceof RateLimitExceededError) {
+      return NextResponse.json({ error: error.message }, { status: 429 });
+    }
+    throw error;
+  }
+
   const { caseId } = await params;
 
   const caseItem = await getCaseById(caseId);

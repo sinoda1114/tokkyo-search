@@ -14,6 +14,7 @@ vi.mock("@/features/analysis/analysis-service", () => ({
 }));
 
 import { POST } from "./route";
+import { resetRateLimitStoreForTests } from "@/lib/rate-limit";
 
 function buildRequest(url: string, body?: unknown): Request {
   return new Request(url, {
@@ -31,6 +32,7 @@ function buildContext(patentId: string) {
 beforeEach(() => {
   getPatentByIdMock.mockReset();
   getOrRunAnalysisMock.mockReset();
+  resetRateLimitStoreForTests();
 });
 
 describe("POST /api/patents/[patentId]/analysis", () => {
@@ -99,5 +101,27 @@ describe("POST /api/patents/[patentId]/analysis", () => {
     expect(response.status).toBe(200);
     const json = await response.json();
     expect(json).toEqual({ status: "error", errorMessage: "接続に失敗しました" });
+  });
+
+  it("同一IPからの短時間の連続リクエストが上限を超えた場合、429を返しgetOrRunAnalysisを呼ばない", async () => {
+    getPatentByIdMock.mockResolvedValue({ id: "patent-1" });
+    getOrRunAnalysisMock.mockResolvedValue({ overview: "概要" });
+
+    // 解析エンドポイントの上限（1分間に10回）まではgetOrRunAnalysisが呼ばれる。
+    for (let i = 0; i < 10; i += 1) {
+      const okResponse = await POST(
+        buildRequest("http://localhost/api/patents/patent-1/analysis"),
+        buildContext("patent-1"),
+      );
+      expect(okResponse.status).toBe(200);
+    }
+
+    const response = await POST(
+      buildRequest("http://localhost/api/patents/patent-1/analysis"),
+      buildContext("patent-1"),
+    );
+
+    expect(response.status).toBe(429);
+    expect(getOrRunAnalysisMock).toHaveBeenCalledTimes(10);
   });
 });
