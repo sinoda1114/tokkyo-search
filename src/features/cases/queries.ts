@@ -8,9 +8,11 @@ export type CaseListItem = typeof cases.$inferSelect;
  * `@/db/client` は関数呼び出し時に遅延インポートする（このモジュールを import しただけでは
  * DB接続用の環境変数を検証しない。テストでは `@/db/client` を vi.mock でテスト用DBに差し替える）。
  */
+const MAX_CASES = 200;
+
 export async function getCases(): Promise<CaseListItem[]> {
   const { db } = await import("@/db/client");
-  return db.select().from(cases).orderBy(desc(cases.updatedAt));
+  return db.select().from(cases).orderBy(desc(cases.updatedAt)).limit(MAX_CASES);
 }
 
 /**

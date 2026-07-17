@@ -14,6 +14,9 @@ export interface SearchResultItem {
   matchedTerms: string[] | null;
 }
 
+/** 案件詳細画面で表示する検索実行履歴の上限件数（無制限クエリによる肥大化を防ぐ）。 */
+const SEARCH_RUNS_BY_CASE_LIMIT = 200;
+
 /**
  * 案件に紐づく検索実行履歴を実行日時の降順で取得する。
  * `@/db/client` は関数呼び出し時に遅延インポートする（他featureと同じパターン）。
@@ -24,7 +27,8 @@ export async function getSearchRunsByCase(caseId: string): Promise<SearchRunRow[
     .select()
     .from(searchRuns)
     .where(eq(searchRuns.caseId, caseId))
-    .orderBy(desc(searchRuns.executedAt));
+    .orderBy(desc(searchRuns.executedAt))
+    .limit(SEARCH_RUNS_BY_CASE_LIMIT);
 }
 
 /** IDで検索実行を1件取得する。存在しない場合はundefinedを返す。 */

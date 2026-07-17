@@ -80,6 +80,24 @@ describe("getSearchRunsByCase", () => {
 
     expect(result).toEqual([]);
   });
+
+  it("検索実行履歴が上限件数を超える場合は上限件数までに切り詰める", async () => {
+    await seedCase("case-many");
+    const LIMIT = 200;
+    const values = Array.from({ length: LIMIT + 1 }, (_, i) => ({
+      id: `run-many-${i}`,
+      caseId: "case-many",
+      conditions: { dateFrom: "2000-01-01", dateTo: "2020-01-01", terms: ["a"] },
+      status: "success" as const,
+      resultCount: i,
+      executedAt: new Date(2024, 0, 1, 0, 0, i),
+    }));
+    await db.insert(searchRuns).values(values);
+
+    const result = await getSearchRunsByCase("case-many");
+
+    expect(result.length).toBe(LIMIT);
+  });
 });
 
 describe("getSearchRunById", () => {

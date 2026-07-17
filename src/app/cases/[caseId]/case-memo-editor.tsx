@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
+import { z } from "zod";
 import { Alert, Button, Heading, Paragraph, TextArea, TextField } from "@heroui/react";
 import { updateCaseMemo } from "@/features/cases/actions";
 
@@ -9,23 +10,49 @@ interface CaseMemoEditorProps {
   initialMemo: string | null;
 }
 
+function extractErrorMessage(error: unknown): string {
+  if (error instanceof z.ZodError) {
+    return error.issues[0]?.message ?? "メモの保存に失敗しました。";
+  }
+  return error instanceof Error ? error.message : "メモの保存に失敗しました。";
+}
+
 export function CaseMemoEditor({ caseId, initialMemo }: CaseMemoEditorProps) {
   const [memo, setMemo] = useState(initialMemo ?? "");
   const [draft, setDraft] = useState(initialMemo ?? "");
   const [isEditing, setIsEditing] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
+  useEffect(() => {
+    if (!isEditing || draft === memo) {
+      return;
+    }
+    function handleBeforeUnload(event: BeforeUnloadEvent) {
+      event.preventDefault();
+      event.returnValue = "";
+    }
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [isEditing, draft, memo]);
+
   function handleSave() {
+    setErrorMessage(null);
     startTransition(async () => {
-      const result = await updateCaseMemo(caseId, draft);
-      setMemo(result.memo ?? "");
-      setDraft(result.memo ?? "");
-      setIsEditing(false);
+      try {
+        const result = await updateCaseMemo(caseId, draft);
+        setMemo(result.memo ?? "");
+        setDraft(result.memo ?? "");
+        setIsEditing(false);
+      } catch (error: unknown) {
+        setErrorMessage(extractErrorMessage(error));
+      }
     });
   }
 
   function handleCancel() {
     setDraft(memo);
+    setErrorMessage(null);
     setIsEditing(false);
   }
 
@@ -41,7 +68,7 @@ export function CaseMemoEditor({ caseId, initialMemo }: CaseMemoEditorProps) {
       </div>
 
       {!isEditing ? (
-        <Paragraph>{memo || "メモはまだありません。"}</Paragraph>
+        <Paragraph className="whitespace-pre-wrap">{memo || "メモはまだありません。"}</Paragraph>
       ) : (
         <div className="flex flex-col gap-3">
           <Alert status="warning">
@@ -54,6 +81,14 @@ export function CaseMemoEditor({ caseId, initialMemo }: CaseMemoEditorProps) {
           <TextField value={draft} onChange={setDraft} aria-label="メモ">
             <TextArea rows={6} />
           </TextField>
+          {errorMessage ? (
+            <Alert status="danger">
+              <Alert.Content>
+                <Alert.Title>メモを保存できませんでした</Alert.Title>
+                <Alert.Description>{errorMessage}</Alert.Description>
+              </Alert.Content>
+            </Alert>
+          ) : null}
           <div className="flex justify-end gap-2">
             <Button
               type="button"
@@ -71,7 +106,7 @@ export function CaseMemoEditor({ caseId, initialMemo }: CaseMemoEditorProps) {
               onPress={handleSave}
               isDisabled={isPending}
             >
-              {isPending ? "保存中..." : "保存"}
+              {isPending ? "保存中…" : "保存"}
             </Button>
           </div>
         </div>

@@ -77,7 +77,10 @@ export default async function SearchRunPage({ params }: SearchRunPageProps) {
       </dl>
 
       {results.length === 0 ? (
-        <Paragraph color="muted">条件に一致する特許が見つかりませんでした。</Paragraph>
+        <div className="flex flex-col gap-2">
+          <Paragraph color="muted">条件に一致する特許が見つかりませんでした。</Paragraph>
+          <Link href={`/cases/${caseId}/terms`}>検索語の管理に戻って条件を見直し、再実行する</Link>
+        </div>
       ) : (
         <ol className="flex flex-col gap-3">
           {results.map((result) => (
@@ -86,14 +89,19 @@ export default async function SearchRunPage({ params }: SearchRunPageProps) {
               className="flex flex-col gap-1 rounded-[var(--radius)] border border-[var(--border)] p-4"
             >
               <div className="flex items-center justify-between gap-2">
-                <Link href={`/cases/${caseId}/patents/${result.patentId}`}>
-                  {result.publicationNumber}
+                <Link
+                  href={`/cases/${caseId}/patents/${result.patentId}`}
+                  className="text-lg font-semibold"
+                >
+                  {result.title ?? "（名称不明）"}
                 </Link>
-                <Paragraph size="sm" color="muted">
+                <Paragraph size="sm" color="muted" className="tabular-nums">
                   #{result.rank}
                 </Paragraph>
               </div>
-              <Paragraph>{result.title ?? "（名称不明）"}</Paragraph>
+              <Paragraph size="sm" color="muted">
+                {result.publicationNumber}
+              </Paragraph>
               <Paragraph size="sm" color="muted">
                 {(result.assignees ?? []).join("、") || "出願人不明"} ・{" "}
                 {result.publicationDate ?? "公開日不明"}

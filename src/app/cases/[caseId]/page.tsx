@@ -57,27 +57,40 @@ export default async function CaseDetailPage({ params }: CaseDetailPageProps) {
   return (
     <div className="flex flex-col gap-8">
       <div>
-        <Heading level={1}>{caseItem.name}</Heading>
+        <Heading level={1} className="text-balance">
+          {caseItem.name}
+        </Heading>
         <dl className="mt-3 grid grid-cols-[max-content_1fr] gap-x-6 gap-y-1 text-sm">
           <dt className="text-[var(--muted,gray)]">管理番号</dt>
-          <dd>{caseItem.referenceNumber ?? "未設定"}</dd>
+          <dd className="text-pretty">{caseItem.referenceNumber ?? "未設定"}</dd>
           <dt className="text-[var(--muted,gray)]">技術分野</dt>
-          <dd>{caseItem.technicalField ?? "未設定"}</dd>
+          <dd className="text-pretty">{caseItem.technicalField ?? "未設定"}</dd>
         </dl>
       </div>
 
       <CaseMemoEditor caseId={caseItem.id} initialMemo={caseItem.memo} />
 
       <section className="flex flex-col gap-2 rounded-[var(--radius)] border border-[var(--border)] p-4">
-        <Heading level={2}>検索語</Heading>
-        <Paragraph color="muted">検索語を登録してください。</Paragraph>
+        <Heading level={2} className="text-balance">
+          検索語
+        </Heading>
+        <Paragraph color="muted" className="text-pretty">
+          検索語を登録してください。
+        </Paragraph>
         <Link href={`/cases/${caseItem.id}/terms`}>検索語の管理へ進む</Link>
       </section>
 
       <section className="flex flex-col gap-3 rounded-[var(--radius)] border border-[var(--border)] p-4">
-        <Heading level={2}>検索実行履歴</Heading>
+        <Heading level={2} className="text-balance">
+          検索実行履歴
+        </Heading>
         {searchRuns.length === 0 ? (
-          <Paragraph color="muted">まだ検索を実行していません。</Paragraph>
+          <>
+            <Paragraph color="muted" className="text-pretty">
+              まだ検索を実行していません。
+            </Paragraph>
+            <Link href={`/cases/${caseItem.id}/terms`}>検索語作成画面で検索を実行する</Link>
+          </>
         ) : (
           <ul className="flex flex-col gap-2">
             {searchRuns.map((run) => (
@@ -85,31 +98,38 @@ export default async function CaseDetailPage({ params }: CaseDetailPageProps) {
                 key={run.id}
                 className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-[var(--radius)] border border-[var(--border)] p-3 text-sm"
               >
-                <Link href={`/cases/${caseItem.id}/runs/${run.id}`}>
+                <Link href={`/cases/${caseItem.id}/runs/${run.id}`} className="tabular-nums">
                   {formatDateTime(run.executedAt)}
                 </Link>
                 <span>{run.status === "success" ? "成功" : "失敗"}</span>
-                <span>{run.status === "success" ? `${run.resultCount ?? 0}件` : "-"}</span>
-                <span>{formatBytesBilled(run.bytesBilled)}</span>
+                <span className="tabular-nums">
+                  {run.status === "success" ? `${run.resultCount ?? 0}件` : "-"}
+                </span>
+                <span className="tabular-nums">{formatBytesBilled(run.bytesBilled)}</span>
               </li>
             ))}
           </ul>
         )}
       </section>
 
-      <section className="flex flex-col gap-3 rounded-[var(--radius)] border border-[var(--border)] p-4">
-        <Heading level={2}>評価済み特許</Heading>
+      <section className="flex flex-col gap-3 rounded-[var(--radius)] border border-[var(--border)] bg-[color-mix(in_oklch,var(--accent)_6%,transparent)] p-4">
+        <Heading level={2} className="text-balance">
+          評価済み特許
+        </Heading>
         {evaluatedPatents.length === 0 ? (
-          <Paragraph color="muted">評価済みの特許はまだありません。</Paragraph>
+          <Paragraph color="muted" className="text-pretty">
+            評価済みの特許はまだありません。
+          </Paragraph>
         ) : (
           <div className="flex flex-col gap-4">
             {EVALUATED_STATUS_ORDER.map((status) => (
               <div key={status} className="flex flex-col gap-2">
-                <Heading level={3}>
-                  {CASE_PATENT_STATUS_LABELS[status]}（{evaluatedByStatus[status].length}件）
+                <Heading level={3} className="text-balance">
+                  {CASE_PATENT_STATUS_LABELS[status]}（
+                  <span className="tabular-nums">{evaluatedByStatus[status].length}</span>件）
                 </Heading>
                 {evaluatedByStatus[status].length === 0 ? (
-                  <Paragraph size="sm" color="muted">
+                  <Paragraph size="sm" color="muted" className="text-pretty">
                     該当する特許はありません。
                   </Paragraph>
                 ) : (
@@ -119,17 +139,24 @@ export default async function CaseDetailPage({ params }: CaseDetailPageProps) {
                         key={patent.id}
                         className="flex flex-col gap-1 rounded-[var(--radius)] border border-[var(--border)] p-3 text-sm"
                       >
-                        <Link href={`/cases/${caseItem.id}/patents/${patent.id}`}>
+                        <Link
+                          href={`/cases/${caseItem.id}/patents/${patent.id}`}
+                          className="line-clamp-2"
+                        >
                           {patent.title ?? patent.publicationNumber}
                         </Link>
-                        <Paragraph size="sm" color="muted">
+                        <Paragraph size="sm" color="muted" className="text-pretty">
                           {patent.publicationNumber}
                         </Paragraph>
                         {evaluation.status === "excluded" && evaluation.exclusionReason ? (
-                          <Paragraph size="sm">対象外理由: {evaluation.exclusionReason}</Paragraph>
+                          <Paragraph size="sm" className="line-clamp-2">
+                            対象外理由: {evaluation.exclusionReason}
+                          </Paragraph>
                         ) : null}
                         {evaluation.comment ? (
-                          <Paragraph size="sm">コメント: {evaluation.comment}</Paragraph>
+                          <Paragraph size="sm" className="line-clamp-2">
+                            コメント: {evaluation.comment}
+                          </Paragraph>
                         ) : null}
                       </li>
                     ))}

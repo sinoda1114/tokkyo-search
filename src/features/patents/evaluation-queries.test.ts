@@ -111,4 +111,24 @@ describe("getEvaluatedPatentsByCase", () => {
 
     expect(result).toHaveLength(0);
   });
+
+  it("評価済み特許が上限件数を超える場合は上限件数までに切り詰める", async () => {
+    await db.insert(cases).values({ id: "case-many", name: "多数評価案件" });
+    const LIMIT = 200;
+    const patentValues = Array.from({ length: LIMIT + 1 }, (_, i) => ({
+      id: `patent-many-${i}`,
+      publicationNumber: `JP-MANY-${i}-A`,
+    }));
+    await db.insert(patents).values(patentValues);
+    const casePatentValues = patentValues.map(({ id }) => ({
+      caseId: "case-many",
+      patentId: id,
+      status: "important" as const,
+    }));
+    await db.insert(casePatents).values(casePatentValues);
+
+    const result = await getEvaluatedPatentsByCase("case-many");
+
+    expect(result.length).toBe(LIMIT);
+  });
 });

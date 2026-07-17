@@ -37,6 +37,9 @@ export interface EvaluatedPatentItem {
   evaluation: CasePatentRow;
 }
 
+/** 案件詳細画面で表示する評価済み特許の上限件数（無制限クエリによる肥大化を防ぐ）。 */
+const EVALUATED_PATENTS_BY_CASE_LIMIT = 200;
+
 /**
  * 案件詳細画面の集計表示用に、評価済み（status !== "unrated"）の特許を特許情報とJOINして取得する。
  * status別のグルーピングは呼び出し側（page.tsx）で行う。
@@ -50,5 +53,6 @@ export async function getEvaluatedPatentsByCase(caseId: string): Promise<Evaluat
     })
     .from(casePatents)
     .innerJoin(patents, eq(casePatents.patentId, patents.id))
-    .where(and(eq(casePatents.caseId, caseId), ne(casePatents.status, "unrated")));
+    .where(and(eq(casePatents.caseId, caseId), ne(casePatents.status, "unrated")))
+    .limit(EVALUATED_PATENTS_BY_CASE_LIMIT);
 }

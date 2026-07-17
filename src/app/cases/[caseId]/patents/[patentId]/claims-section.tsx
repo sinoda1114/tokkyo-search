@@ -34,9 +34,9 @@ export function ClaimsSection({ patentId, initialClaimsText }: ClaimsSectionProp
       {claimsText ? (
         <Paragraph className="whitespace-pre-wrap">{claimsText}</Paragraph>
       ) : isPending ? (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2" aria-live="polite" aria-busy={isPending}>
           <Spinner size="sm" />
-          <Paragraph color="muted">請求項を取得しています...</Paragraph>
+          <Paragraph color="muted">請求項を取得しています…</Paragraph>
         </div>
       ) : hasFetched ? (
         <Alert status="warning">

@@ -85,9 +85,9 @@ export function AnalysisSection({ caseId, patentId, initialAnalysis }: AnalysisS
       <Heading level={2}>AI文献解析</Heading>
 
       {isLoading ? (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2" aria-live="polite" aria-busy={isLoading}>
           <Spinner size="sm" />
-          <Paragraph color="muted">AIが解析しています...</Paragraph>
+          <Paragraph color="muted">AIが解析しています…</Paragraph>
         </div>
       ) : (
         <AnalysisBody

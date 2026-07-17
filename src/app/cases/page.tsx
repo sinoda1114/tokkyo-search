@@ -12,7 +12,7 @@ const dateFormatter = new Intl.DateTimeFormat("ja-JP", {
 });
 
 const primaryLinkClassName =
-  "inline-flex items-center justify-center rounded-[var(--radius)] bg-[var(--accent)] px-4 py-2 text-sm font-medium text-[var(--accent-foreground)] transition-opacity hover:opacity-90";
+  "inline-flex items-center justify-center rounded-[var(--radius)] bg-[var(--accent)] px-4 py-2 text-sm font-medium text-[var(--accent-foreground)] no-underline transition-opacity hover:opacity-90 hover:no-underline";
 
 export default async function CasesPage() {
   const items = await getCases();
@@ -54,7 +54,9 @@ export default async function CasesPage() {
                     </Table.Cell>
                     <Table.Cell>{item.referenceNumber ?? "—"}</Table.Cell>
                     <Table.Cell>{item.technicalField ?? "—"}</Table.Cell>
-                    <Table.Cell>{dateFormatter.format(item.updatedAt)}</Table.Cell>
+                    <Table.Cell className="tabular-nums">
+                      {dateFormatter.format(item.updatedAt)}
+                    </Table.Cell>
                   </Table.Row>
                 ))}
               </Table.Body>

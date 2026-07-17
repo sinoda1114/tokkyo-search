@@ -28,11 +28,15 @@ export function TermList({ termsByType }: TermListProps) {
                   {TERM_TYPE_LABELS[type]}
                 </Paragraph>
                 <div className="flex flex-wrap gap-2">
-                  {terms.map((term) => (
-                    <Chip key={term.id} color={term.source === "user" ? "default" : "accent"} size="sm">
-                      {term.text}
-                    </Chip>
-                  ))}
+                  {terms.map((term) => {
+                    const isUserTerm = term.source === "user";
+                    return (
+                      <Chip key={term.id} color={isUserTerm ? "default" : "accent"} size="sm">
+                        {isUserTerm ? "" : "AI: "}
+                        {term.text}
+                      </Chip>
+                    );
+                  })}
                 </div>
               </div>
             );
