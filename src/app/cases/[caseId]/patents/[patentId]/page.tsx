@@ -133,7 +133,12 @@ export default async function PatentDetailPage({ params }: PatentDetailPageProps
 
       <AnalysisSection caseId={caseId} patentId={patent.id} initialAnalysis={initialAnalysis} />
 
-      <Link href={googlePatentsUrl} target="_blank" rel="noopener noreferrer">
+      <Link
+        href={googlePatentsUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="Google Patentsで開く（新しいタブで開きます）"
+      >
         Google Patentsで開く
       </Link>
     </div>

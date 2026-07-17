@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { z } from "zod";
 import { Alert, Button, Heading, Paragraph, TextArea, TextField } from "@heroui/react";
 import { updateCaseMemo } from "@/features/cases/actions";
@@ -23,6 +23,18 @@ export function CaseMemoEditor({ caseId, initialMemo }: CaseMemoEditorProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+
+  useEffect(() => {
+    if (!isEditing || draft === memo) {
+      return;
+    }
+    function handleBeforeUnload(event: BeforeUnloadEvent) {
+      event.preventDefault();
+      event.returnValue = "";
+    }
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [isEditing, draft, memo]);
 
   function handleSave() {
     setErrorMessage(null);

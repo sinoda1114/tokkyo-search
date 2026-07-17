@@ -52,9 +52,10 @@ test("案件作成から検索語登録・AI展開・検索実行・特許詳細
   ).toBeVisible();
 
   // 提案された候補（全件デフォルト選択済み）をそのまま保存する
+  // AI由来の検索語チップには視覚的な区別のため「AI: 」プレフィックスが付く。
   await page.getByRole("button", { name: "選択した候補を保存" }).click();
-  await expect(termListSection.getByText("放熱機構", { exact: true })).toBeVisible();
-  await expect(termListSection.getByText("冷却構造", { exact: true })).toBeVisible();
+  await expect(termListSection.getByText("AI: 放熱機構", { exact: true })).toBeVisible();
+  await expect(termListSection.getByText("AI: 冷却構造", { exact: true })).toBeVisible();
 
   // 5. 検索実行（BigQueryはモックされ、固定の検索結果1件が返る）
   const searchSection = page.locator("section", {
@@ -80,10 +81,11 @@ test("案件作成から検索語登録・AI展開・検索実行・特許詳細
   ]);
 
   // 6. 検索実行結果（固定フィクスチャの特許1件が表示される）
+  // タイトルが主導線のLinkになっており、出願番号は補助表示（非リンク）。
   await expect(page.getByRole("heading", { level: 1, name: "検索実行結果" })).toBeVisible();
-  const patentLink = page.getByRole("link", { name: "JP2020-000001A" });
+  const patentLink = page.getByRole("link", { name: "半導体パッケージの放熱構造" });
   await expect(patentLink).toBeVisible();
-  await expect(page.getByText("半導体パッケージの放熱構造")).toBeVisible();
+  await expect(page.getByText("JP2020-000001A")).toBeVisible();
 
   // 7. 特許詳細へ
   await patentLink.click();

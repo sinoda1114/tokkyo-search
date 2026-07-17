@@ -82,6 +82,11 @@ export function EvaluationControl({
     submit("unrated");
   }
 
+  function handleCancelExclusion() {
+    setError(null);
+    setIsEnteringReason(false);
+  }
+
   function handleSaveComment() {
     setError(null);
     startTransition(async () => {
@@ -100,6 +105,9 @@ export function EvaluationControl({
     });
   }
 
+  const isReasonError = isEnteringReason && error === REASON_REQUIRED_MESSAGE;
+  const isCommentUnchanged = commentDraft === comment;
+
   return (
     <div className="flex flex-col gap-2">
       <div className="flex flex-wrap items-center gap-2">
@@ -110,6 +118,7 @@ export function EvaluationControl({
           type="button"
           size="sm"
           variant={status === "important" ? "primary" : "outline"}
+          aria-pressed={status === "important"}
           onPress={() => handleSelectStatus("important")}
           isDisabled={isPending}
         >
@@ -119,6 +128,7 @@ export function EvaluationControl({
           type="button"
           size="sm"
           variant={status === "reference" ? "primary" : "outline"}
+          aria-pressed={status === "reference"}
           onPress={() => handleSelectStatus("reference")}
           isDisabled={isPending}
         >
@@ -128,6 +138,7 @@ export function EvaluationControl({
           type="button"
           size="sm"
           variant={status === "excluded" ? "danger" : "outline"}
+          aria-pressed={status === "excluded"}
           onPress={() => handleSelectStatus("excluded")}
           isDisabled={isPending}
         >
@@ -148,15 +159,29 @@ export function EvaluationControl({
 
       {isEnteringReason ? (
         <div className="flex flex-col gap-2">
-          <TextField value={reasonDraft} onChange={setReasonDraft} aria-label="対象外理由" isRequired>
+          <TextField
+            value={reasonDraft}
+            onChange={setReasonDraft}
+            aria-label="対象外理由"
+            isRequired
+            isInvalid={Boolean(isReasonError)}
+            aria-describedby={isReasonError ? "exclusion-reason-error" : undefined}
+          >
             <TextArea rows={2} placeholder="対象外理由を入力してください" />
           </TextField>
+          {isReasonError ? (
+            <Alert id="exclusion-reason-error" status="danger">
+              <Alert.Content>
+                <Alert.Description>{error}</Alert.Description>
+              </Alert.Content>
+            </Alert>
+          ) : null}
           <div className="flex justify-end gap-2">
             <Button
               type="button"
               variant="ghost"
               size="sm"
-              onPress={() => setIsEnteringReason(false)}
+              onPress={handleCancelExclusion}
               isDisabled={isPending}
             >
               キャンセル
@@ -168,7 +193,7 @@ export function EvaluationControl({
               onPress={handleConfirmExclusion}
               isDisabled={isPending}
             >
-              {isPending ? "保存中..." : "対象外として保存"}
+              {isPending ? "保存中…" : "対象外として保存"}
             </Button>
           </div>
         </div>
@@ -179,13 +204,18 @@ export function EvaluationControl({
           <TextField value={commentDraft} onChange={setCommentDraft} aria-label="評価コメント">
             <TextArea rows={2} placeholder="評価に関するコメント（任意）" />
           </TextField>
-          <div className="flex justify-end">
+          <div className="flex items-center justify-end gap-2">
+            {isCommentUnchanged && !isPending ? (
+              <Paragraph size="xs" color="muted">
+                変更がありません
+              </Paragraph>
+            ) : null}
             <Button
               type="button"
               variant="tertiary"
               size="sm"
               onPress={handleSaveComment}
-              isDisabled={isPending || commentDraft === comment}
+              isDisabled={isPending || isCommentUnchanged}
             >
               コメントを保存
             </Button>
@@ -193,7 +223,7 @@ export function EvaluationControl({
         </div>
       ) : null}
 
-      {error ? (
+      {error && !isReasonError ? (
         <Alert status="danger">
           <Alert.Content>
             <Alert.Description>{error}</Alert.Description>

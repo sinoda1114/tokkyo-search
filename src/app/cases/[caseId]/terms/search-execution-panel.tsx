@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Alert, Button, Checkbox, Heading, Input, Label, Paragraph, Spinner, TextField } from "@heroui/react";
 import { getLocalTimeZone, today } from "@internationalized/date";
@@ -73,6 +73,8 @@ export function SearchExecutionPanel({ caseId, termsByType }: SearchExecutionPan
   const [touched, setTouched] = useState<TouchedFields>(INITIAL_TOUCHED);
   const [submitState, setSubmitState] = useState<SubmitState>({ status: "idle" });
   const [isNavigating, startNavigateTransition] = useTransition();
+  const termsGroupRef = useRef<HTMLDivElement>(null);
+  const dateRangeWrapperRef = useRef<HTMLDivElement>(null);
 
   const selectedTermIds = useMemo(
     () => selectableTerms.filter((term) => !deselectedTermIds.has(term.id)).map((term) => term.id),
@@ -126,7 +128,14 @@ export function SearchExecutionPanel({ caseId, termsByType }: SearchExecutionPan
     });
 
     if (!parsed.success) {
-      // 各項目の指摘はフィールド直下にインライン表示するため、ここでは送信を止めるだけでよい。
+      // 各項目の指摘はフィールド直下にインライン表示するが、それだけでは気づきにくいため
+      // 最初のエラー項目へフォーカスを移動する。
+      const fieldErrorsOnSubmit = collectFieldErrors(parsed.error);
+      if (fieldErrorsOnSubmit.termIds) {
+        termsGroupRef.current?.focus();
+      } else if (fieldErrorsOnSubmit.dateFrom ?? fieldErrorsOnSubmit.dateTo) {
+        dateRangeWrapperRef.current?.focus();
+      }
       return;
     }
 
@@ -178,7 +187,14 @@ export function SearchExecutionPanel({ caseId, termsByType }: SearchExecutionPan
       {selectableTerms.length === 0 ? (
         <Paragraph color="muted">先に検索語を登録してください。</Paragraph>
       ) : (
-        <div className="flex flex-col gap-2">
+        <div
+          ref={termsGroupRef}
+          role="group"
+          aria-label="検索に使う検索語"
+          aria-describedby={termsErrorVisible ? "term-ids-error" : undefined}
+          tabIndex={-1}
+          className="flex flex-col gap-2"
+        >
           <Paragraph size="sm" color="muted">
             検索に使う検索語
           </Paragraph>
@@ -199,29 +215,31 @@ export function SearchExecutionPanel({ caseId, termsByType }: SearchExecutionPan
             ))}
           </div>
           {termsErrorVisible ? (
-            <Paragraph size="sm" className="text-[var(--danger,#dc2626)]">
+            <Paragraph id="term-ids-error" role="alert" size="sm" className="text-[var(--danger,#dc2626)]">
               {fieldErrors.termIds}
             </Paragraph>
           ) : null}
         </div>
       )}
 
-      <DateRangeField
-        label="検索対象期間（開始日・終了日）"
-        dateFrom={dateFrom}
-        dateTo={dateTo}
-        onChange={handleDateRangeChange}
-        onBlur={() => setTouched((prev) => ({ ...prev, dateFrom: true, dateTo: true }))}
-        isInvalid={dateErrorVisible}
-        errorMessage={dateErrorVisible ? dateErrorMessage : undefined}
-      />
+      <div ref={dateRangeWrapperRef} tabIndex={-1}>
+        <DateRangeField
+          label="検索対象期間（開始日・終了日）"
+          dateFrom={dateFrom}
+          dateTo={dateTo}
+          onChange={handleDateRangeChange}
+          onBlur={() => setTouched((prev) => ({ ...prev, dateFrom: true, dateTo: true }))}
+          isInvalid={dateErrorVisible}
+          errorMessage={dateErrorVisible ? dateErrorMessage : undefined}
+        />
+      </div>
 
-      <TextField value={assignee} onChange={setAssignee} aria-label="出願人">
+      <TextField value={assignee} onChange={setAssignee}>
         <Label>出願人（部分一致・任意）</Label>
         <Input placeholder="例: テスト工業" />
       </TextField>
 
-      <TextField value={ipcPrefix} onChange={setIpcPrefix} aria-label="IPC前方一致">
+      <TextField value={ipcPrefix} onChange={setIpcPrefix}>
         <Label>IPC前方一致（任意）</Label>
         <Input placeholder="例: H01L" />
       </TextField>
@@ -245,7 +263,7 @@ export function SearchExecutionPanel({ caseId, termsByType }: SearchExecutionPan
           {isSubmitting ? (
             <span className="flex items-center gap-2">
               <Spinner size="sm" />
-              検索を実行中...
+              検索を実行中…
             </span>
           ) : (
             "検索を実行"

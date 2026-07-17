@@ -169,14 +169,14 @@ export function ExpansionPanel({ caseId, originalTerms, technicalField }: Expans
           onPress={runExpansion}
           isDisabled={fetchState.status === "loading" || originalTerms.length === 0}
         >
-          {fetchState.status === "loading" ? "展開中..." : "AI展開を実行"}
+          {fetchState.status === "loading" ? "展開中…" : "AI展開を実行"}
         </Button>
       </div>
 
       {fetchState.status === "loading" ? (
         <div className="flex items-center gap-2">
           <Spinner size="sm" />
-          <Paragraph color="muted">Geminiに問い合わせています...</Paragraph>
+          <Paragraph color="muted">Geminiに問い合わせています…</Paragraph>
         </div>
       ) : null}
 
@@ -193,7 +193,7 @@ export function ExpansionPanel({ caseId, originalTerms, technicalField }: Expans
       ) : null}
 
       {fetchState.status === "success" ? (
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-4" aria-live="polite">
           {fetchState.candidates.length === 0 ? (
             <Paragraph color="muted">提案できる候補が見つかりませんでした。</Paragraph>
           ) : (
@@ -221,7 +221,7 @@ export function ExpansionPanel({ caseId, originalTerms, technicalField }: Expans
               </div>
               <div className="flex items-center justify-between gap-3">
                 <Button type="button" variant="primary" onPress={handleSave} isDisabled={isSaving}>
-                  {isSaving ? "保存中..." : "選択した候補を保存"}
+                  {isSaving ? "保存中…" : "選択した候補を保存"}
                 </Button>
               </div>
             </>
@@ -229,7 +229,11 @@ export function ExpansionPanel({ caseId, originalTerms, technicalField }: Expans
         </div>
       ) : null}
 
-      {saveMessage ? <Paragraph color="muted">{saveMessage}</Paragraph> : null}
+      {saveMessage ? (
+        <Paragraph color="muted" aria-live="polite">
+          {saveMessage}
+        </Paragraph>
+      ) : null}
     </section>
   );
 }

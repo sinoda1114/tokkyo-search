@@ -107,13 +107,14 @@ export function ResearchCandidatesPanel({ caseId, analysis }: ResearchCandidates
         気になる語を選んで案件の検索語一覧に追加できます。追加後は検索語作成画面から再検索できます。
       </Paragraph>
 
-      {groups.map((group) =>
-        group.items.length > 0 ? (
+      {groups.map((group) => {
+        const groupLabelId = `research-candidates-group-${group.label}`;
+        return group.items.length > 0 ? (
           <div key={group.label} className="flex flex-col gap-2">
-            <Paragraph size="sm" color="muted">
+            <Paragraph size="sm" color="muted" id={groupLabelId}>
               {group.label}
             </Paragraph>
-            <div className="flex flex-wrap gap-3">
+            <div role="group" aria-labelledby={groupLabelId} className="flex flex-wrap gap-3">
               {group.items.map((item) => (
                 <Checkbox
                   key={item.key}
@@ -130,8 +131,8 @@ export function ResearchCandidatesPanel({ caseId, analysis }: ResearchCandidates
               ))}
             </div>
           </div>
-        ) : null,
-      )}
+        ) : null;
+      })}
 
       <div className="flex items-center justify-between gap-3">
         <div className="flex flex-col gap-1">
