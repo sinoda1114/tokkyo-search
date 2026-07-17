@@ -22,11 +22,11 @@ This version has breaking changes — APIs, conventions, and file structure may 
 | 項目 | 値 |
 |---|---|
 | リポ実体 dir（統合＋デプロイ専用・ここで機能開発しない） | `~/dev/tokko-search` |
-| GitHub | 未作成（実装完了後にユーザー承認を得て作成） |
-| デプロイ基盤 | Vercel（git 駆動・feature push = Preview / main マージ = Production・未接続） |
+| GitHub | `sinoda1114/tokko-search`（private） |
+| デプロイ基盤 | Vercel（git 駆動・feature push = Preview / main マージ = Production・未接続、デプロイは別途実施） |
 | 本番 URL | 未デプロイ |
 | 絶対 URL の env | `NEXT_PUBLIC_SITE_URL`（ハードコード禁止） |
-| タスク正本 | GitHub Issue / Project「Patent Search Assistant」（GitHub 作成後に設定） |
+| タスク正本 | GitHub Issue / Project「Patent Search Assistant Tasks」（#11） |
 
 ## プロダクト固有の制約（重要）
 
