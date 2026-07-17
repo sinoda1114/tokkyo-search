@@ -104,6 +104,9 @@ export function buildSearchQuery(
   const tableRef = buildTableRef(projectId, dataset);
   validateDate(conditions.dateFrom, "dateFrom");
   validateDate(conditions.dateTo, "dateTo");
+  if (conditions.dateFrom > conditions.dateTo) {
+    throw new Error("dateFrom は dateTo 以前の日付を指定してください");
+  }
   const pattern = buildTermsPattern(conditions.terms);
   const searchClaims = conditions.searchClaims ?? false;
 

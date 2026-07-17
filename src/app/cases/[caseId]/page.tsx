@@ -12,18 +12,12 @@ import {
 } from "@/features/patents/evaluation-options";
 import { getLlmLogsByCase } from "@/features/llm-logs/queries";
 import type { CasePatentStatus } from "@/db/schema";
+import { formatBytesBilled as formatBytesBilledBase, formatDateTime } from "@/lib/format";
 import { CaseMemoEditor } from "./case-memo-editor";
 import { LlmLogsSection } from "./llm-logs-section";
 
-const BYTES_PER_GIB = 1024 ** 3;
-
 function formatBytesBilled(bytes: number | null): string {
-  if (bytes === null || bytes === undefined) return "-";
-  return `${(bytes / BYTES_PER_GIB).toFixed(3)} GB`;
-}
-
-function formatDateTime(value: Date): string {
-  return value.toLocaleString("ja-JP");
+  return formatBytesBilledBase(bytes, "-");
 }
 
 /** 評価済み特許をstatus別（重要→参考→対象外）にグルーピングする。 */

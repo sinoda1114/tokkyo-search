@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
-import { z } from "zod";
 import { getCaseById } from "@/features/cases/queries";
 import { runSearch } from "@/features/patent-search/search-service";
 import { SearchValidationError } from "@/features/patent-search/errors";
+import { collectFieldErrors, searchRequestSchema } from "@/features/patent-search/validation";
 import { BigQueryCostLimitError } from "@/lib/bigquery/cost-guard";
 import { RateLimitExceededError, checkRateLimit } from "@/lib/rate-limit";
 import { getRequestIp } from "@/lib/request-ip";
@@ -12,22 +12,6 @@ export const dynamic = "force-dynamic";
 
 // BigQueryはクエリごとに課金が発生するため、同一IPからの連打を抑制する。
 const SEARCH_RATE_LIMIT = { limit: 5, windowMs: 60_000 };
-
-// 空文字は「未指定」として扱う（フロントから `assignee: ""` 等が届いても400にしない）。
-const optionalNonEmptyString = z
-  .string()
-  .trim()
-  .optional()
-  .transform((value) => (value && value.length > 0 ? value : undefined));
-
-const requestBodySchema = z.object({
-  termIds: z.array(z.string().trim().min(1)).min(1, "検索語を1件以上選択してください"),
-  dateFrom: z.string().trim().min(1, "検索対象期間の開始日を指定してください"),
-  dateTo: z.string().trim().min(1, "検索対象期間の終了日を指定してください"),
-  searchClaims: z.boolean().optional(),
-  assignee: optionalNonEmptyString,
-  ipcPrefix: optionalNonEmptyString,
-});
 
 interface RouteContext {
   params: Promise<{ caseId: string }>;
@@ -66,10 +50,13 @@ export async function POST(request: Request, { params }: RouteContext): Promise<
     return NextResponse.json({ error: "リクエストボディが不正です" }, { status: 400 });
   }
 
-  const parsed = requestBodySchema.safeParse(body);
+  const parsed = searchRequestSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
-      { error: parsed.error.issues[0]?.message ?? "リクエストが不正です" },
+      {
+        error: parsed.error.issues[0]?.message ?? "リクエストが不正です",
+        fieldErrors: collectFieldErrors(parsed.error),
+      },
       { status: 400 },
     );
   }

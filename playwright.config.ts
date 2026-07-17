@@ -32,6 +32,10 @@ export default defineConfig({
     baseURL: E2E_BASE_URL,
     trace: "on-first-retry",
     screenshot: "only-on-failure",
+    // 日本語UI前提のプロダクトのため、日付ピッカー等ロケール依存のレンダリング（年/月/日順・aria-label文言）を
+    // 実際のユーザー環境に合わせる。既定（en-US）のままだとMM/DD/YYYY順・英語ラベルになりテストが実体と乖離する。
+    locale: "ja-JP",
+    timezoneId: "Asia/Tokyo",
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: {

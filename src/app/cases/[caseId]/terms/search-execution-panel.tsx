@@ -1,10 +1,12 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Alert, Button, Checkbox, Heading, Input, Label, Paragraph, Spinner, TextField } from "@heroui/react";
 import type { SearchTermsByType } from "@/features/search-terms/queries";
 import { TERM_TYPE_LABELS, TERM_TYPE_ORDER } from "@/features/search-terms/term-type-labels";
+import { collectFieldErrors, searchRequestSchema } from "@/features/patent-search/validation";
+import { DateRangeField } from "./date-range-field";
 
 interface SearchExecutionPanelProps {
   caseId: string;
@@ -17,6 +19,14 @@ interface SelectableTerm {
 }
 
 type SubmitState = { status: "idle" } | { status: "loading" } | { status: "error"; message: string };
+
+interface TouchedFields {
+  termIds: boolean;
+  dateFrom: boolean;
+  dateTo: boolean;
+}
+
+const INITIAL_TOUCHED: TouchedFields = { termIds: false, dateFrom: false, dateTo: false };
 
 function flattenTerms(termsByType: SearchTermsByType): SelectableTerm[] {
   const result: SelectableTerm[] = [];
@@ -48,10 +58,28 @@ export function SearchExecutionPanel({ caseId, termsByType }: SearchExecutionPan
   const [dateTo, setDateTo] = useState("");
   const [assignee, setAssignee] = useState("");
   const [ipcPrefix, setIpcPrefix] = useState("");
+  const [touched, setTouched] = useState<TouchedFields>(INITIAL_TOUCHED);
   const [submitState, setSubmitState] = useState<SubmitState>({ status: "idle" });
   const [isNavigating, startNavigateTransition] = useTransition();
 
+  // 送信前でも各フィールドの妥当性をリアルタイムに把握し、「送信して初めてエラーに気づく」を防ぐ。
+  const fieldErrors = useMemo(() => {
+    const parsed = searchRequestSchema.safeParse({
+      termIds: Array.from(selectedTermIds),
+      dateFrom,
+      dateTo,
+      assignee,
+      ipcPrefix,
+    });
+    return parsed.success ? {} : collectFieldErrors(parsed.error);
+  }, [selectedTermIds, dateFrom, dateTo, assignee, ipcPrefix]);
+
+  const termsErrorVisible = touched.termIds && Boolean(fieldErrors.termIds);
+  const dateErrorVisible = (touched.dateFrom || touched.dateTo) && Boolean(fieldErrors.dateFrom ?? fieldErrors.dateTo);
+  const dateErrorMessage = fieldErrors.dateTo ?? fieldErrors.dateFrom;
+
   function toggleTerm(id: string, checked: boolean) {
+    setTouched((prev) => ({ ...prev, termIds: true }));
     setSelectedTermIds((prev) => {
       const next = new Set(prev);
       if (checked) {
@@ -63,16 +91,25 @@ export function SearchExecutionPanel({ caseId, termsByType }: SearchExecutionPan
     });
   }
 
+  function handleDateRangeChange(nextDateFrom: string, nextDateTo: string) {
+    setTouched((prev) => ({ ...prev, dateFrom: true, dateTo: true }));
+    setDateFrom(nextDateFrom);
+    setDateTo(nextDateTo);
+  }
+
   async function handleSubmit() {
-    if (selectedTermIds.size === 0) {
-      setSubmitState({ status: "error", message: "検索に使う検索語を1件以上選択してください。" });
-      return;
-    }
-    if (!dateFrom || !dateTo) {
-      setSubmitState({
-        status: "error",
-        message: "検索対象期間（開始日・終了日）を指定してください。",
-      });
+    setTouched({ termIds: true, dateFrom: true, dateTo: true });
+
+    const parsed = searchRequestSchema.safeParse({
+      termIds: Array.from(selectedTermIds),
+      dateFrom,
+      dateTo,
+      assignee,
+      ipcPrefix,
+    });
+
+    if (!parsed.success) {
+      // 各項目の指摘はフィールド直下にインライン表示するため、ここでは送信を止めるだけでよい。
       return;
     }
 
@@ -83,11 +120,11 @@ export function SearchExecutionPanel({ caseId, termsByType }: SearchExecutionPan
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          termIds: Array.from(selectedTermIds),
-          dateFrom,
-          dateTo,
-          assignee: assignee.trim() || undefined,
-          ipcPrefix: ipcPrefix.trim() || undefined,
+          termIds: parsed.data.termIds,
+          dateFrom: parsed.data.dateFrom,
+          dateTo: parsed.data.dateTo,
+          assignee: parsed.data.assignee,
+          ipcPrefix: parsed.data.ipcPrefix,
         }),
       });
       const json: unknown = await response.json();
@@ -144,35 +181,23 @@ export function SearchExecutionPanel({ caseId, termsByType }: SearchExecutionPan
               </Checkbox>
             ))}
           </div>
+          {termsErrorVisible ? (
+            <Paragraph size="sm" className="text-[var(--danger,#dc2626)]">
+              {fieldErrors.termIds}
+            </Paragraph>
+          ) : null}
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div className="flex flex-col gap-1">
-          <label htmlFor="search-date-from" className="text-sm text-[var(--muted,gray)]">
-            検索対象期間（開始日・必須）
-          </label>
-          <input
-            id="search-date-from"
-            type="date"
-            value={dateFrom}
-            onChange={(event) => setDateFrom(event.target.value)}
-            className="rounded-[var(--radius)] border border-[var(--border)] px-3 py-2 text-sm"
-          />
-        </div>
-        <div className="flex flex-col gap-1">
-          <label htmlFor="search-date-to" className="text-sm text-[var(--muted,gray)]">
-            検索対象期間（終了日・必須）
-          </label>
-          <input
-            id="search-date-to"
-            type="date"
-            value={dateTo}
-            onChange={(event) => setDateTo(event.target.value)}
-            className="rounded-[var(--radius)] border border-[var(--border)] px-3 py-2 text-sm"
-          />
-        </div>
-      </div>
+      <DateRangeField
+        label="検索対象期間（開始日・終了日）"
+        dateFrom={dateFrom}
+        dateTo={dateTo}
+        onChange={handleDateRangeChange}
+        onBlur={() => setTouched((prev) => ({ ...prev, dateFrom: true, dateTo: true }))}
+        isInvalid={dateErrorVisible}
+        errorMessage={dateErrorVisible ? dateErrorMessage : undefined}
+      />
 
       <TextField value={assignee} onChange={setAssignee} aria-label="出願人">
         <Label>出願人（部分一致・任意）</Label>
