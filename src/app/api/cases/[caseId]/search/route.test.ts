@@ -158,6 +158,18 @@ describe("POST /api/cases/[caseId]/search", () => {
     expect(runSearchMock).not.toHaveBeenCalled();
   });
 
+  it("dateFromがdateToより後のとき400を返し、fieldErrors.dateToを含む", async () => {
+    const response = await POST(
+      buildRequest({ termIds: ["term-1"], dateFrom: "2024-12-31", dateTo: "2000-01-01" }),
+      buildContext("case-1"),
+    );
+
+    expect(response.status).toBe(400);
+    const json = await response.json();
+    expect(json.fieldErrors.dateTo).toBe("検索対象期間の終了日は開始日以降の日付を指定してください");
+    expect(runSearchMock).not.toHaveBeenCalled();
+  });
+
   it("不正なJSONボディのとき400を返す", async () => {
     const request = new Request("http://localhost/api/cases/case-1/search", {
       method: "POST",

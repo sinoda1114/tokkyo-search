@@ -34,6 +34,25 @@ describe("buildSearchQuery", () => {
       ).toThrow(Error);
     });
 
+    it("throws when dateFrom is after dateTo", () => {
+      expect(() =>
+        buildSearchQuery("proj", "patents_jp", {
+          ...baseConditions,
+          dateFrom: "2024-12-31",
+          dateTo: "2000-01-01",
+        }),
+      ).toThrow(Error);
+    });
+
+    it("allows dateFrom equal to dateTo", () => {
+      const result = buildSearchQuery("proj", "patents_jp", {
+        ...baseConditions,
+        dateFrom: "2020-01-01",
+        dateTo: "2020-01-01",
+      });
+      expect(result.params.dateFrom).toBe("2020-01-01");
+    });
+
     it("includes DATE-cast bounds in the SQL when dates are valid", () => {
       const result = buildSearchQuery("proj", "patents_jp", baseConditions);
       expect(result.sql).toContain("publication_date >= DATE(@dateFrom)");

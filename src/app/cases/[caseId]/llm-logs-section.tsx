@@ -1,13 +1,10 @@
 import { Heading, Paragraph } from "@heroui/react";
 import type { LlmLogRow } from "@/features/llm-logs/queries";
 import { LLM_LOG_KIND_LABELS } from "@/features/llm-logs/labels";
+import { formatDateTime } from "@/lib/format";
 
 interface LlmLogsSectionProps {
   logs: LlmLogRow[];
-}
-
-function formatDateTime(value: Date): string {
-  return value.toLocaleString("ja-JP");
 }
 
 /**

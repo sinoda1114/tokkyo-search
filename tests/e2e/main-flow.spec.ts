@@ -64,8 +64,15 @@ test("案件作成から検索語登録・AI展開・検索実行・特許詳細
   // イベントの奪い合いで不安定になるため、可視のラベルテキストをクリックして切り替える。
   await searchSection.getByText("[入力語] 放熱構造", { exact: true }).click();
   await searchSection.getByText("[類義語] 放熱機構", { exact: true }).click();
-  await page.locator("#search-date-from").fill("2019-01-01");
-  await page.locator("#search-date-to").fill("2021-01-01");
+  // HeroUI DateRangePickerはネイティブ<input type="date">ではなく年/月/日のspinbuttonで構成される。
+  // 各spinbuttonへキー入力すると自動的に次のセグメントへフォーカスが送られる。
+  await page.getByRole("spinbutton", { name: /^年, 開始日,/ }).click();
+  await page.keyboard.type("2019");
+  await page.keyboard.type("01");
+  await page.keyboard.type("01");
+  await page.keyboard.type("2021");
+  await page.keyboard.type("01");
+  await page.keyboard.type("01");
 
   await Promise.all([
     page.waitForURL(/\/cases\/[^/]+\/runs\/[^/]+$/),

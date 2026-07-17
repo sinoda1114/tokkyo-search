@@ -3,25 +3,16 @@ import { Alert, Chip, Heading, Link, Paragraph } from "@heroui/react";
 import { getCaseById } from "@/features/cases/queries";
 import { getSearchResultsByRun, getSearchRunById } from "@/features/patent-search/queries";
 import { getCasePatentStatusesByCase } from "@/features/patents/evaluation-queries";
+import { formatBytesBilled, formatDateTime } from "@/lib/format";
 import { EvaluationControl } from "./evaluation-control";
 
 // 検索結果は都度DBの最新状態を反映するため force-dynamic（キャッシュしない）。
 export const dynamic = "force-dynamic";
 
-const BYTES_PER_GIB = 1024 ** 3;
 const ABSTRACT_PREVIEW_LENGTH = 120;
 
 interface SearchRunPageProps {
   params: Promise<{ caseId: string; runId: string }>;
-}
-
-function formatBytesBilled(bytes: number | null): string {
-  if (bytes === null || bytes === undefined) return "不明";
-  return `${(bytes / BYTES_PER_GIB).toFixed(3)} GB`;
-}
-
-function formatDateTime(value: Date): string {
-  return value.toLocaleString("ja-JP");
 }
 
 function previewAbstract(abstract: string | null): string | null {
