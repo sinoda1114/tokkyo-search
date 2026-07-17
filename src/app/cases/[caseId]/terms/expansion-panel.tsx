@@ -220,7 +220,6 @@ export function ExpansionPanel({ caseId, originalTerms, technicalField }: Expans
                 })}
               </div>
               <div className="flex items-center justify-between gap-3">
-                <Paragraph color="muted">{saveMessage ?? ""}</Paragraph>
                 <Button type="button" variant="primary" onPress={handleSave} isDisabled={isSaving}>
                   {isSaving ? "保存中..." : "選択した候補を保存"}
                 </Button>
@@ -229,6 +228,8 @@ export function ExpansionPanel({ caseId, originalTerms, technicalField }: Expans
           )}
         </div>
       ) : null}
+
+      {saveMessage ? <Paragraph color="muted">{saveMessage}</Paragraph> : null}
     </section>
   );
 }
