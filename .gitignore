@@ -15,6 +15,7 @@
 
 # next.js
 /.next/
+/.next-e2e/
 /out/
 
 # production
@@ -37,6 +38,8 @@ yarn-error.log*
 # local sqlite db files (turso dev)
 *.db
 *.db-journal
+*.db-wal
+*.db-shm
 
 # vercel
 .vercel
@@ -44,3 +47,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# playwright (E2E)
+/test-results/
+/playwright-report/
+/blob-report/

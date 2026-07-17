@@ -42,6 +42,34 @@ function parseServiceAccountKey(base64Key: string): ServiceAccountKey {
   return parsed;
 }
 
+/**
+ * E2Eテスト専用のモックモード判定。
+ * `MOCK_EXTERNAL_APIS=1` が設定されている場合のみ有効になり、実際のBigQuery呼び出しを行わない。
+ * 本番環境で誤って有効化されないよう、値は厳密に "1" のときのみtrueとする。
+ */
+function isMockExternalApisEnabled(): boolean {
+  return process.env.MOCK_EXTERNAL_APIS === "1";
+}
+
+/** E2Eテスト用の固定フィクスチャ行（`query-builder.ts` の SEARCH_COLUMNS と対応する形）。 */
+const MOCK_SEARCH_ROW = {
+  publication_number: "JP2020-000001A",
+  application_number: "JP2019-000001",
+  country_code: "JP",
+  kind_code: "A",
+  publication_date: "2020-01-15",
+  filing_date: "2019-01-10",
+  title_ja: "半導体パッケージの放熱構造",
+  abstract_ja:
+    "本発明は半導体パッケージにおける放熱構造に関するものであり、放熱性に優れた半導体パッケージを提供することを目的とする。",
+  assignees: ["テスト工業株式会社"],
+  ipc_codes: ["H01L23/34"],
+  cpc_codes: ["H01L23/34"],
+  cited_publications: ["JP2015-000123A"],
+};
+
+const MOCK_ESTIMATED_BYTES = 1_000_000;
+
 let cachedClient: BigQuery | undefined;
 
 /**
@@ -65,6 +93,10 @@ function readTotalBytes(metadata: QueryJobMetadata, field: "totalBytesBilled" | 
 
 /** dryRun実行でクエリのスキャン見積もりバイト数を取得する（実クエリは実行しない）。 */
 export async function estimateQueryBytes(query: BuiltQuery): Promise<number> {
+  if (isMockExternalApisEnabled()) {
+    return MOCK_ESTIMATED_BYTES;
+  }
+
   const client = getBigQueryClient();
   const [job] = await client.createQueryJob({
     query: query.sql,
@@ -82,6 +114,13 @@ export async function estimateQueryBytes(query: BuiltQuery): Promise<number> {
 export async function runSearchQuery<T = Record<string, unknown>>(
   query: BuiltQuery,
 ): Promise<QueryExecutionResult<T>> {
+  if (isMockExternalApisEnabled()) {
+    return {
+      rows: [MOCK_SEARCH_ROW] as unknown as T[],
+      totalBytesProcessed: MOCK_ESTIMATED_BYTES,
+    };
+  }
+
   const estimatedBytes = await estimateQueryBytes(query);
   assertWithinBudget(estimatedBytes, env.BQ_MAX_BYTES_BILLED);
 

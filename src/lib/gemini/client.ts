@@ -19,6 +19,36 @@ const RETRY_DELAYS_MS = [1000, 4000];
 const SCHEMA_RETRY_NOTE =
   "\n\n直前の出力は指定されたJSONスキーマに厳密に従っていませんでした。指定されたJSONスキーマに厳密に従って、もう一度JSONのみを出力してください。";
 
+/**
+ * E2Eテスト専用のモックモード判定。
+ * `MOCK_EXTERNAL_APIS=1` が設定されている場合のみ有効になり、実際のGemini呼び出しを行わない。
+ * 本番環境で誤って有効化されないよう、値は厳密に "1" のときのみtrueとする。
+ */
+function isMockExternalApisEnabled(): boolean {
+  return process.env.MOCK_EXTERNAL_APIS === "1";
+}
+
+/** E2Eテスト用の固定フィクスチャ（検索語展開）。 */
+const MOCK_EXPANSION_RESULT: ExpansionResult = {
+  terms: [
+    { type: "synonym", text: "放熱機構", sourceTerm: "放熱構造" },
+    { type: "broader", text: "冷却構造", sourceTerm: "放熱構造" },
+    { type: "english", text: "heat dissipation structure", sourceTerm: "放熱構造" },
+  ],
+};
+
+/** E2Eテスト用の固定フィクスチャ（特許解析）。 */
+const MOCK_ANALYSIS_RESULT: AnalysisResult = {
+  overview: "半導体パッケージの放熱構造に関する発明の概要（E2Eテスト用フィクスチャ）。",
+  background: "従来の半導体パッケージは放熱性に課題があった。",
+  problem: "放熱効率を高めつつ小型化を両立することが課題である。",
+  solution: "放熱部材の形状と配置を工夫することで放熱経路を確保する。",
+  effect: "放熱性が向上し、パッケージの信頼性が高まる。",
+  keyTerms: ["放熱構造", "半導体パッケージ"],
+  searchCandidates: [{ type: "synonym", text: "放熱機構" }],
+  citedReferences: ["JP2015-000123A"],
+};
+
 let cachedClient: GoogleGenAI | undefined;
 
 /**
@@ -163,6 +193,10 @@ export async function generateExpansion(
   technicalField?: string,
   caseId?: string,
 ): Promise<ExpansionResult> {
+  if (isMockExternalApisEnabled()) {
+    return MOCK_EXPANSION_RESULT;
+  }
+
   const prompt = buildExpansionPrompt(terms, technicalField);
 
   try {
@@ -199,6 +233,10 @@ export async function analyzePatent(
   patent: AnalysisPatentInput,
   patentId?: string,
 ): Promise<AnalysisResult> {
+  if (isMockExternalApisEnabled()) {
+    return MOCK_ANALYSIS_RESULT;
+  }
+
   const prompt = buildAnalysisPrompt(patent);
 
   try {
