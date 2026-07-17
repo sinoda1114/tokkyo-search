@@ -63,6 +63,16 @@ describe("addSearchTerms", () => {
     const rows = await db.select().from(searchTerms).where(eq(searchTerms.caseId, "case-4"));
     expect(rows).toHaveLength(0);
   });
+
+  it("101文字を超える語は保存しない", async () => {
+    await seedCase("case-11");
+
+    const result = await addSearchTerms("case-11", ["あ".repeat(101), "正常な語"]);
+
+    expect(result.insertedCount).toBe(1);
+    const rows = await db.select().from(searchTerms).where(eq(searchTerms.caseId, "case-11"));
+    expect(rows.map((row) => row.text)).toEqual(["正常な語"]);
+  });
 });
 
 describe("saveSelectedExpansions", () => {

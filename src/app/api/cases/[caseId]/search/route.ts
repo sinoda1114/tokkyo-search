@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { getCaseById } from "@/features/cases/queries";
 import { runSearch } from "@/features/patent-search/search-service";
 import { SearchValidationError } from "@/features/patent-search/errors";
 import { BigQueryCostLimitError } from "@/lib/bigquery/cost-guard";
@@ -38,6 +39,11 @@ function extractErrorMessage(error: unknown): string {
  */
 export async function POST(request: Request, { params }: RouteContext): Promise<Response> {
   const { caseId } = await params;
+
+  const caseItem = await getCaseById(caseId);
+  if (!caseItem) {
+    return NextResponse.json({ error: "案件が見つかりません" }, { status: 404 });
+  }
 
   let body: unknown;
   try {

@@ -1,11 +1,16 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
-const { runSearchMock } = vi.hoisted(() => ({
+const { runSearchMock, getCaseByIdMock } = vi.hoisted(() => ({
   runSearchMock: vi.fn(),
+  getCaseByIdMock: vi.fn(),
 }));
 
 vi.mock("@/features/patent-search/search-service", () => ({
   runSearch: runSearchMock,
+}));
+
+vi.mock("@/features/cases/queries", () => ({
+  getCaseById: getCaseByIdMock,
 }));
 
 import { POST } from "./route";
@@ -26,9 +31,23 @@ function buildContext(caseId: string) {
 
 beforeEach(() => {
   runSearchMock.mockReset();
+  getCaseByIdMock.mockReset();
+  getCaseByIdMock.mockResolvedValue({ id: "case-1" });
 });
 
 describe("POST /api/cases/[caseId]/search", () => {
+  it("案件が存在しない場合、BigQueryを呼ばず404を返す", async () => {
+    getCaseByIdMock.mockResolvedValue(undefined);
+
+    const response = await POST(
+      buildRequest({ termIds: ["term-1"], dateFrom: "2000-01-01", dateTo: "2024-12-31" }),
+      buildContext("missing-case"),
+    );
+
+    expect(response.status).toBe(404);
+    expect(runSearchMock).not.toHaveBeenCalled();
+  });
+
   it("正常系: runSearchの結果からsearchRunIdをJSONで返す", async () => {
     runSearchMock.mockResolvedValue({
       searchRunId: "run-1",

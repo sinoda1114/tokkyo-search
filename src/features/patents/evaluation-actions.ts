@@ -9,8 +9,8 @@ const ratePatentSchema = z
     caseId: z.string().trim().min(1, "caseIdは必須です"),
     patentId: z.string().trim().min(1, "patentIdは必須です"),
     status: z.enum(casePatentStatusValues),
-    comment: z.string().trim().optional(),
-    exclusionReason: z.string().trim().optional(),
+    comment: z.string().trim().max(2000, "コメントは2000文字以内で入力してください").optional(),
+    exclusionReason: z.string().trim().max(500, "対象外理由は500文字以内で入力してください").optional(),
   })
   .refine((data) => data.status !== "excluded" || (data.exclusionReason ?? "").length > 0, {
     message: "対象外にする場合は対象外理由を入力してください",

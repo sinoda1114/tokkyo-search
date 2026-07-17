@@ -6,12 +6,16 @@ import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { cases } from "@/db/schema";
 
+const MEMO_MAX_LENGTH = 5000;
+
 const createCaseSchema = z.object({
-  name: z.string().trim().min(1, "案件名を入力してください"),
-  referenceNumber: z.string().trim().optional(),
-  technicalField: z.string().trim().optional(),
-  memo: z.string().trim().optional(),
+  name: z.string().trim().min(1, "案件名を入力してください").max(200, "案件名は200文字以内で入力してください"),
+  referenceNumber: z.string().trim().max(100, "管理番号は100文字以内で入力してください").optional(),
+  technicalField: z.string().trim().max(100, "技術分野は100文字以内で入力してください").optional(),
+  memo: z.string().trim().max(MEMO_MAX_LENGTH, `メモは${MEMO_MAX_LENGTH}文字以内で入力してください`).optional(),
 });
+
+const updateMemoSchema = z.string().trim().max(MEMO_MAX_LENGTH, `メモは${MEMO_MAX_LENGTH}文字以内で入力してください`);
 
 export interface CreateCaseFormState {
   errors?: {
@@ -79,7 +83,7 @@ export interface UpdateCaseMemoResult {
  * 直接呼び出す想定（FormDataを介さずcaseIdとmemoを受け取る）。
  */
 export async function updateCaseMemo(caseId: string, memo: string): Promise<UpdateCaseMemoResult> {
-  const trimmed = memo.trim();
+  const trimmed = updateMemoSchema.parse(memo);
   const { db } = await import("@/db/client");
   const [updated] = await db
     .update(cases)

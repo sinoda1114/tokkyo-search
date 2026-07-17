@@ -42,6 +42,14 @@ describe("createCase", () => {
     expect(result.errors?.name).toBeDefined();
   });
 
+  it("案件名が201文字のときバリデーションエラーを返す", async () => {
+    const formData = buildFormData({ name: "あ".repeat(201) });
+
+    const result = await createCase({}, formData);
+
+    expect(result.errors?.name).toBeDefined();
+  });
+
   it("正常系: 案件をDBに保存し、詳細ページへredirectする", async () => {
     const formData = buildFormData({
       name: "新規案件",
@@ -116,5 +124,11 @@ describe("updateCaseMemo", () => {
     const result = await updateCaseMemo("case-memo-2", "   ");
 
     expect(result.memo).toBeNull();
+  });
+
+  it("5001文字のメモは例外を投げる", async () => {
+    await db.insert(cases).values({ id: "case-memo-3", name: "メモ上限対象" });
+
+    await expect(updateCaseMemo("case-memo-3", "あ".repeat(5001))).rejects.toThrow();
   });
 });

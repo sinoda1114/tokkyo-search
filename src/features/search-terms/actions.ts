@@ -3,8 +3,13 @@
 import { nanoid } from "nanoid";
 import { searchTerms, type SearchTermType } from "@/db/schema";
 
+/** 検索語1件あたりの上限文字数。極端に長い文字列がそのまま検索語として登録されるのを防ぐ。 */
+const TERM_TEXT_MAX_LENGTH = 100;
+
 function normalizeTerms(terms: string[]): string[] {
-  const trimmed = terms.map((term) => term.trim()).filter((term) => term.length > 0);
+  const trimmed = terms
+    .map((term) => term.trim())
+    .filter((term) => term.length > 0 && term.length <= TERM_TEXT_MAX_LENGTH);
   return Array.from(new Set(trimmed));
 }
 
@@ -62,12 +67,13 @@ export async function saveSelectedExpansions(
   caseId: string,
   selected: SelectedExpansionTerm[],
 ): Promise<SaveSelectedExpansionsResult> {
-  if (selected.length === 0) {
+  const valid = selected.filter((term) => term.text.trim().length <= TERM_TEXT_MAX_LENGTH);
+  if (valid.length === 0) {
     return { insertedCount: 0 };
   }
 
   const { db } = await import("@/db/client");
-  const rows = selected.map((term) => ({
+  const rows = valid.map((term) => ({
     id: nanoid(),
     caseId,
     termType: term.type,
@@ -95,12 +101,13 @@ export interface ResearchTerm {
  * 重複（同一案件・同一タイプ・同一テキスト）は無視する。
  */
 export async function addResearchTerms(caseId: string, terms: ResearchTerm[]): Promise<void> {
-  if (terms.length === 0) {
+  const valid = terms.filter((term) => term.text.trim().length <= TERM_TEXT_MAX_LENGTH);
+  if (valid.length === 0) {
     return;
   }
 
   const { db } = await import("@/db/client");
-  const rows = terms.map((term) => ({
+  const rows = valid.map((term) => ({
     id: nanoid(),
     caseId,
     termType: term.termType,

@@ -134,4 +134,15 @@ describe("ratePatent", () => {
       ratePatent({ caseId: "", patentId: "patent-7", status: "reference" }),
     ).rejects.toThrow();
   });
+
+  it("commentが2001文字のときバリデーションエラーになる", async () => {
+    await expect(
+      ratePatent({
+        caseId: "case-8",
+        patentId: "patent-8",
+        status: "reference",
+        comment: "あ".repeat(2001),
+      }),
+    ).rejects.toThrow();
+  });
 });
