@@ -46,7 +46,9 @@ export function AddTermsForm({ caseId }: AddTermsFormProps) {
     <section className="flex flex-col gap-3 rounded-[var(--radius)] border border-[var(--border)] p-4">
       <Heading level={2}>検索語を登録</Heading>
       <Alert status="warning">
+        <Alert.Indicator />
         <Alert.Content>
+          <Alert.Title>入力前にご確認ください</Alert.Title>
           <Alert.Description>
             未公開発明の核心部分・秘密情報はこのシステムに入力しないでください。
           </Alert.Description>

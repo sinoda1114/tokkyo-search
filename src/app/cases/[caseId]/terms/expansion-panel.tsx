@@ -141,7 +141,7 @@ export function ExpansionPanel({ caseId, originalTerms, technicalField }: Expans
       ) : (
         <div className="flex flex-col gap-2">
           <Paragraph size="sm" color="muted">
-            展開する検索語
+            展開する検索語（AIへの問い合わせ対象を選べます。通常は全て選択のままで構いません）
           </Paragraph>
           <div className="flex flex-wrap gap-3">
             {originalTerms.map((term) => (

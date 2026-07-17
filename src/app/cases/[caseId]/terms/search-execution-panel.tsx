@@ -3,10 +3,20 @@
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Alert, Button, Checkbox, Heading, Input, Label, Paragraph, Spinner, TextField } from "@heroui/react";
+import { getLocalTimeZone, today } from "@internationalized/date";
 import type { SearchTermsByType } from "@/features/search-terms/queries";
 import { TERM_TYPE_LABELS, TERM_TYPE_ORDER } from "@/features/search-terms/term-type-labels";
 import { collectFieldErrors, searchRequestSchema } from "@/features/patent-search/validation";
 import { DateRangeField } from "./date-range-field";
+
+const DEFAULT_SEARCH_RANGE_YEARS = 5;
+
+/** 検索対象期間の初期値。開始日・終了日は必須入力のため、毎回手入力させず直近5年を自動セットする。 */
+function getDefaultDateRange(): { from: string; to: string } {
+  const end = today(getLocalTimeZone());
+  const start = end.subtract({ years: DEFAULT_SEARCH_RANGE_YEARS });
+  return { from: start.toString(), to: end.toString() };
+}
 
 interface SearchExecutionPanelProps {
   caseId: string;
@@ -53,19 +63,26 @@ function extractErrorMessage(json: unknown): string {
 export function SearchExecutionPanel({ caseId, termsByType }: SearchExecutionPanelProps) {
   const router = useRouter();
   const selectableTerms = flattenTerms(termsByType);
-  const [selectedTermIds, setSelectedTermIds] = useState<Set<string>>(new Set());
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
+  // 「除外した語のID」だけを保持する設計にすることで、新しく登録・AI展開で追加された検索語は
+  // 何もしなくても自動的に選択済み（検索対象）になる。ユーザーが個別に外した語だけ覚えておく。
+  const [deselectedTermIds, setDeselectedTermIds] = useState<Set<string>>(new Set());
+  const [dateFrom, setDateFrom] = useState(() => getDefaultDateRange().from);
+  const [dateTo, setDateTo] = useState(() => getDefaultDateRange().to);
   const [assignee, setAssignee] = useState("");
   const [ipcPrefix, setIpcPrefix] = useState("");
   const [touched, setTouched] = useState<TouchedFields>(INITIAL_TOUCHED);
   const [submitState, setSubmitState] = useState<SubmitState>({ status: "idle" });
   const [isNavigating, startNavigateTransition] = useTransition();
 
+  const selectedTermIds = useMemo(
+    () => selectableTerms.filter((term) => !deselectedTermIds.has(term.id)).map((term) => term.id),
+    [selectableTerms, deselectedTermIds],
+  );
+
   // 送信前でも各フィールドの妥当性をリアルタイムに把握し、「送信して初めてエラーに気づく」を防ぐ。
   const fieldErrors = useMemo(() => {
     const parsed = searchRequestSchema.safeParse({
-      termIds: Array.from(selectedTermIds),
+      termIds: selectedTermIds,
       dateFrom,
       dateTo,
       assignee,
@@ -80,12 +97,12 @@ export function SearchExecutionPanel({ caseId, termsByType }: SearchExecutionPan
 
   function toggleTerm(id: string, checked: boolean) {
     setTouched((prev) => ({ ...prev, termIds: true }));
-    setSelectedTermIds((prev) => {
+    setDeselectedTermIds((prev) => {
       const next = new Set(prev);
       if (checked) {
-        next.add(id);
-      } else {
         next.delete(id);
+      } else {
+        next.add(id);
       }
       return next;
     });
@@ -101,7 +118,7 @@ export function SearchExecutionPanel({ caseId, termsByType }: SearchExecutionPan
     setTouched({ termIds: true, dateFrom: true, dateTo: true });
 
     const parsed = searchRequestSchema.safeParse({
-      termIds: Array.from(selectedTermIds),
+      termIds: selectedTermIds,
       dateFrom,
       dateTo,
       assignee,
@@ -169,7 +186,7 @@ export function SearchExecutionPanel({ caseId, termsByType }: SearchExecutionPan
             {selectableTerms.map((term) => (
               <Checkbox
                 key={term.id}
-                isSelected={selectedTermIds.has(term.id)}
+                isSelected={!deselectedTermIds.has(term.id)}
                 onChange={(checked) => toggleTerm(term.id, checked)}
               >
                 <Checkbox.Content>
