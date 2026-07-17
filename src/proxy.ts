@@ -29,7 +29,7 @@ export default function proxy(request: NextRequest): NextResponse {
 
   return new NextResponse("認証が必要です", {
     status: 401,
-    headers: { "WWW-Authenticate": 'Basic realm="tokko-search"' },
+    headers: { "WWW-Authenticate": 'Basic realm="tokkyo-search"' },
   });
 }
 

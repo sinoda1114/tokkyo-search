@@ -1,4 +1,4 @@
-# Patent Search Assistant（tokko-search）
+# Patent Search Assistant（tokkyo-search）
 
 一般的な検索語から公開特許を検索し、特許文献から新しい検索語・引用文献を抽出して再検索する、先行技術調査支援システム。未公開発明・秘密情報は扱わない。
 
@@ -17,7 +17,7 @@ npm run dev
 
 | 変数 | 取得方法 |
 |---|---|
-| `TURSO_DATABASE_URL` / `TURSO_AUTH_TOKEN` | `turso db create tokko-search` → `turso db show tokko-search --url` / `turso db tokens create tokko-search` |
+| `TURSO_DATABASE_URL` / `TURSO_AUTH_TOKEN` | `turso db create tokkyo-search` → `turso db show tokkyo-search --url` / `turso db tokens create tokkyo-search` |
 | `GCP_PROJECT_ID` / `GCP_SERVICE_ACCOUNT_KEY` | GCPプロジェクト作成 + BigQuery API有効化 + 課金有効化 + サービスアカウント作成（`roles/bigquery.jobUser`）。JSONキーをbase64化して設定 |
 | `BQ_DATASET` / `BQ_MAX_BYTES_BILLED` | `patents_jp` / `53687091200`（50GiB、デフォルトのまま推奨） |
 | `GEMINI_API_KEY` / `GEMINI_MODEL` | Google AI Studio |

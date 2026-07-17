@@ -4,9 +4,9 @@
 This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
 <!-- END:nextjs-agent-rules -->
 
-# Patent Search Assistant（tokko-search）— プロジェクト指示
+# Patent Search Assistant（tokkyo-search）— プロジェクト指示
 
-特許先行技術調査支援システム（`tokko-search`）の AI 向けプロジェクト指示。
+特許先行技術調査支援システム（`tokkyo-search`）の AI 向けプロジェクト指示。
 
 ## 運用ルール（HOW）の正本
 
@@ -21,8 +21,8 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 | 項目 | 値 |
 |---|---|
-| リポ実体 dir（統合＋デプロイ専用・ここで機能開発しない） | `~/dev/tokko-search` |
-| GitHub | `sinoda1114/tokko-search`（private） |
+| リポ実体 dir（統合＋デプロイ専用・ここで機能開発しない） | `~/dev/tokkyo-search` |
+| GitHub | `sinoda1114/tokkyo-search`（private） |
 | デプロイ基盤 | Vercel（git 駆動・feature push = Preview / main マージ = Production・未接続、デプロイは別途実施） |
 | 本番 URL | 未デプロイ |
 | 絶対 URL の env | `NEXT_PUBLIC_SITE_URL`（ハードコード禁止） |
