@@ -10,8 +10,10 @@ import {
   CASE_PATENT_STATUS_LABELS,
   EVALUATED_STATUS_ORDER,
 } from "@/features/patents/evaluation-options";
+import { getLlmLogsByCase } from "@/features/llm-logs/queries";
 import type { CasePatentStatus } from "@/db/schema";
 import { CaseMemoEditor } from "./case-memo-editor";
+import { LlmLogsSection } from "./llm-logs-section";
 
 const BYTES_PER_GIB = 1024 ** 3;
 
@@ -56,6 +58,7 @@ export default async function CaseDetailPage({ params }: CaseDetailPageProps) {
   const searchRuns = await getSearchRunsByCase(caseItem.id);
   const evaluatedPatents = await getEvaluatedPatentsByCase(caseItem.id);
   const evaluatedByStatus = groupByStatus(evaluatedPatents);
+  const llmLogs = await getLlmLogsByCase(caseItem.id);
 
   return (
     <div className="flex flex-col gap-8">
@@ -143,6 +146,8 @@ export default async function CaseDetailPage({ params }: CaseDetailPageProps) {
           </div>
         )}
       </section>
+
+      <LlmLogsSection logs={llmLogs} />
     </div>
   );
 }
