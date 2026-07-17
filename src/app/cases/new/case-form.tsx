@@ -40,24 +40,39 @@ export function CaseForm() {
         {state.errors?.name ? <FieldError>{state.errors.name[0]}</FieldError> : null}
       </TextField>
 
-      <TextField name="referenceNumber" defaultValue={state.values?.referenceNumber}>
+      <TextField
+        name="referenceNumber"
+        isInvalid={Boolean(state.errors?.referenceNumber)}
+        defaultValue={state.values?.referenceNumber}
+      >
         <Label>管理番号</Label>
         <Input placeholder="例: 2026-001" />
+        {state.errors?.referenceNumber ? (
+          <FieldError>{state.errors.referenceNumber[0]}</FieldError>
+        ) : null}
       </TextField>
 
-      <TextField name="technicalField" defaultValue={state.values?.technicalField}>
+      <TextField
+        name="technicalField"
+        isInvalid={Boolean(state.errors?.technicalField)}
+        defaultValue={state.values?.technicalField}
+      >
         <Label>技術分野</Label>
         <Input placeholder="例: 画像処理" />
+        {state.errors?.technicalField ? (
+          <FieldError>{state.errors.technicalField[0]}</FieldError>
+        ) : null}
       </TextField>
 
-      <TextField name="memo" defaultValue={state.values?.memo}>
+      <TextField name="memo" isInvalid={Boolean(state.errors?.memo)} defaultValue={state.values?.memo}>
         <Label>メモ</Label>
         <TextArea rows={5} placeholder="案件の背景や検索方針など（秘密情報は入力しないこと）" />
+        {state.errors?.memo ? <FieldError>{state.errors.memo[0]}</FieldError> : null}
       </TextField>
 
       <div className="flex justify-end gap-3">
         <Button type="submit" variant="primary" isDisabled={pending}>
-          {pending ? "作成中..." : "案件を作成"}
+          {pending ? "作成中…" : "案件を作成"}
         </Button>
       </div>
     </Form>

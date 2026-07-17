@@ -59,7 +59,9 @@ export function ResearchCandidatesPanel({ caseId, analysis }: ResearchCandidates
   const allItems = groups.flatMap((group) => group.items);
 
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
-  const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [saveMessage, setSaveMessage] = useState<{ type: "success" | "error"; text: string } | null>(
+    null,
+  );
   const [isSaving, startSaveTransition] = useTransition();
 
   if (allItems.length === 0) {
@@ -81,7 +83,7 @@ export function ResearchCandidatesPanel({ caseId, analysis }: ResearchCandidates
   function handleSave() {
     const selected = allItems.filter((item) => selectedKeys.has(item.key));
     if (selected.length === 0) {
-      setSaveMessage("追加する語を選択してください。");
+      setSaveMessage({ type: "error", text: "追加する語を選択してください。" });
       return;
     }
 
@@ -90,7 +92,10 @@ export function ResearchCandidatesPanel({ caseId, analysis }: ResearchCandidates
         caseId,
         selected.map((item) => ({ termType: item.termType, text: item.text })),
       );
-      setSaveMessage("案件の検索語一覧に追加しました。検索語作成画面から再検索できます。");
+      setSaveMessage({
+        type: "success",
+        text: "案件の検索語一覧に追加しました。検索語作成画面から再検索できます。",
+      });
       setSelectedKeys(new Set());
     });
   }
@@ -131,11 +136,16 @@ export function ResearchCandidatesPanel({ caseId, analysis }: ResearchCandidates
       <div className="flex items-center justify-between gap-3">
         <div className="flex flex-col gap-1">
           {saveMessage && (
-            <Alert status="success">
+            <Alert status={saveMessage.type === "error" ? "danger" : "success"}>
               <Alert.Content>
                 <Alert.Description>
-                  {saveMessage}{" "}
-                  <Link href={`/cases/${caseId}/terms`}>検索語作成画面を開く</Link>
+                  {saveMessage.text}
+                  {saveMessage.type === "success" ? (
+                    <>
+                      {" "}
+                      <Link href={`/cases/${caseId}/terms`}>検索語作成画面を開く</Link>
+                    </>
+                  ) : null}
                 </Alert.Description>
               </Alert.Content>
             </Alert>
