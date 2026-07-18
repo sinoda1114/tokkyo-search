@@ -182,16 +182,27 @@ export async function deleteSearchTerm(caseId: string, termId: string): Promise<
   const { db } = await import("@/db/client");
 
   async function deleteWithChildren(id: string): Promise<void> {
-    const children = await db
-      .select({ id: searchTerms.id })
-      .from(searchTerms)
-      .where(and(eq(searchTerms.caseId, caseId), eq(searchTerms.parentTermId, id)));
-
-    for (const child of children) {
-      await deleteWithChildren(child.id);
+    // Collect all descendants with a single iterative query to prevent N+1
+    const allIds = new Set<string>([id]);
+    const toProcess = [id];
+    
+    while (toProcess.length > 0) {
+      const currentIds = toProcess.splice(0);
+      const children = await db
+        .select({ id: searchTerms.id })
+        .from(searchTerms)
+        .where(and(eq(searchTerms.caseId, caseId), inArray(searchTerms.parentTermId, currentIds)));
+      
+      for (const child of children) {
+        if (!allIds.has(child.id)) {
+          allIds.add(child.id);
+          toProcess.push(child.id);
+        }
+      }
     }
-
-    await db.delete(searchTerms).where(and(eq(searchTerms.caseId, caseId), eq(searchTerms.id, id)));
+    
+    // Delete all collected IDs in a single query
+    await db.delete(searchTerms).where(and(eq(searchTerms.caseId, caseId), inArray(searchTerms.id, Array.from(allIds))));
   }
 
   await deleteWithChildren(termId);
