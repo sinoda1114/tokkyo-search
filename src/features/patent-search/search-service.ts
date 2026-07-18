@@ -1,4 +1,4 @@
-import { inArray, sql } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { env } from "@/lib/env";
 import { patents, searchResults, searchRunTerms, searchRuns, searchTerms } from "@/db/schema";
@@ -6,6 +6,8 @@ import { runSearchQuery } from "@/lib/bigquery/client";
 import { BigQueryCostLimitError } from "@/lib/bigquery/cost-guard";
 import { buildSearchQuery, type SearchConditions } from "./query-builder";
 import { SearchValidationError } from "./errors";
+
+type SearchTermRow = typeof searchTerms.$inferSelect;
 
 export interface RunSearchInput {
   caseId: string;
@@ -40,6 +42,8 @@ interface PublicationRow {
   ipc_codes: string[] | null;
   cpc_codes: string[] | null;
   cited_publications: string[] | null;
+  /** LIMIT適用前の総ヒット件数（`query-builder.ts`のCOUNT(*) OVER()ウィンドウ関数で取得）。 */
+  total_match_count: number;
 }
 
 function normalizeBigQueryDate(value: BigQueryDateLike): string | null {
@@ -53,6 +57,48 @@ function normalizeBigQueryDate(value: BigQueryDateLike): string | null {
 function findMatchedTerms(row: PublicationRow, termTexts: string[]): string[] {
   const haystack = `${row.title_ja ?? ""} ${row.abstract_ja ?? ""}`;
   return termTexts.filter((term) => haystack.includes(term));
+}
+
+/**
+ * `parentTermId`をルート（`parentTermId`がnullの行）まで辿り、そのルートのidを返す。
+ * `allTermsById`には案件内の全検索語を渡すこと（選択されていない親を辿るために必要）。
+ * 循環参照（データ不整合）が万一あってもハングしないよう既訪問idはガードする。
+ */
+function resolveRootId(term: SearchTermRow, allTermsById: Map<string, SearchTermRow>): string {
+  let current: SearchTermRow = term;
+  const visited = new Set<string>([current.id]);
+  while (current.parentTermId) {
+    const parent = allTermsById.get(current.parentTermId);
+    if (!parent || visited.has(parent.id)) {
+      break;
+    }
+    visited.add(parent.id);
+    current = parent;
+  }
+  return current.id;
+}
+
+/**
+ * 選択された検索語（`orderedTerms`）を概念グループ（ルートが同じもの同士）にまとめる。
+ * グループの順序・グループ内の語の順序は、いずれも`orderedTerms`の並び順（＝選択順）に従う。
+ */
+function groupTermsByRoot(
+  orderedTerms: SearchTermRow[],
+  allTermsById: Map<string, SearchTermRow>,
+): string[][] {
+  const groupOrder: string[] = [];
+  const textsByRootId = new Map<string, string[]>();
+
+  for (const term of orderedTerms) {
+    const rootId = resolveRootId(term, allTermsById);
+    if (!textsByRootId.has(rootId)) {
+      textsByRootId.set(rootId, []);
+      groupOrder.push(rootId);
+    }
+    textsByRootId.get(rootId)!.push(term.text);
+  }
+
+  return groupOrder.map((rootId) => textsByRootId.get(rootId)!);
 }
 
 /**
@@ -86,11 +132,20 @@ export async function runSearch(input: RunSearchInput): Promise<RunSearchResult>
     );
   }
 
+  // グループ化（AND検索）のためには、選択されていない語であっても親を辿れる必要があるため、
+  // 案件内の全検索語を別途取得する（選択語だけでは親が欠けて根まで辿れない場合がある）。
+  const allCaseTerms = await db
+    .select()
+    .from(searchTerms)
+    .where(eq(searchTerms.caseId, input.caseId));
+  const allTermsById = new Map(allCaseTerms.map((term) => [term.id, term]));
+
   const termTexts = orderedTerms.map((term) => term.text);
+  const termGroups = groupTermsByRoot(orderedTerms, allTermsById);
   const conditions: SearchConditions = {
     dateFrom: input.dateFrom,
     dateTo: input.dateTo,
-    terms: termTexts,
+    termGroups,
     searchClaims: input.searchClaims,
     assignee: input.assignee,
     ipcPrefix: input.ipcPrefix,
@@ -148,10 +203,15 @@ export async function runSearch(input: RunSearchInput): Promise<RunSearchResult>
       }
     }
 
+    // total_match_countはLIMIT適用前の全体件数（COUNT(*) OVER()）。件数だけの再クエリは発行せず、
+    // 本体検索と同じ1回のBigQueryクエリで取得した値をそのまま使う。結果0件のときは0とする。
+    const totalMatchCount = rows[0]?.total_match_count ?? 0;
+    const conditionsWithTotal: SearchConditions = { ...conditions, totalMatchCount };
+
     await db.insert(searchRuns).values({
       id: searchRunId,
       caseId: input.caseId,
-      conditions,
+      conditions: conditionsWithTotal,
       status: "success",
       resultCount: rows.length,
       bytesBilled: executionResult.totalBytesProcessed,

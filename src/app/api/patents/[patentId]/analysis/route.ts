@@ -46,6 +46,17 @@ async function resolveForce(request: Request): Promise<boolean> {
 }
 
 /**
+ * `caseId` をURLのクエリパラメータ（`?caseId=...`）から読み取る。
+ * どの案件の詳細画面から実行された解析かを `llm_logs.caseId` に残すために使う
+ * （案件詳細のAI送受信ログ一覧は `caseId` 一致で抽出するため、これがないと表示されない）。
+ */
+function resolveCaseId(request: Request): string | undefined {
+  const url = new URL(request.url);
+  const caseId = url.searchParams.get("caseId");
+  return caseId && caseId.trim() !== "" ? caseId : undefined;
+}
+
+/**
  * 特許のAI解析を実行（または既存結果を再利用）し、結果をJSONで返す。
  * 実際の再利用・保存の判断は `getOrRunAnalysis` に委譲する。
  */
@@ -67,6 +78,7 @@ export async function POST(request: Request, { params }: RouteContext): Promise<
   }
 
   const force = await resolveForce(request);
-  const result = await getOrRunAnalysis(patentId, force);
+  const caseId = resolveCaseId(request);
+  const result = await getOrRunAnalysis(patentId, force, caseId);
   return NextResponse.json(result);
 }

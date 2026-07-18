@@ -131,7 +131,12 @@ export default async function PatentDetailPage({ params }: PatentDetailPageProps
         initialExclusionReason={evaluation?.exclusionReason}
       />
 
-      <AnalysisSection caseId={caseId} patentId={patent.id} initialAnalysis={initialAnalysis} />
+      <AnalysisSection
+        caseId={caseId}
+        patentId={patent.id}
+        initialAnalysis={initialAnalysis}
+        hasClaimsText={patent.claimsText !== null}
+      />
 
       <Link
         href={googlePatentsUrl}

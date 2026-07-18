@@ -6,9 +6,10 @@ vi.mock("@/db/client", async () => {
   return { db: testDb };
 });
 
-import { createCase, updateCaseMemo } from "@/features/cases/actions";
+import { createCase, deleteCase, updateCase, updateCaseMemo } from "@/features/cases/actions";
 import { db } from "@/db/client";
-import { cases } from "@/db/schema";
+import { casePatents, cases, llmLogs, patents, searchRuns, searchTerms } from "@/db/schema";
+import { eq } from "drizzle-orm";
 
 function buildFormData(entries: Record<string, string>): FormData {
   const formData = new FormData();
@@ -130,5 +131,154 @@ describe("updateCaseMemo", () => {
     await db.insert(cases).values({ id: "case-memo-3", name: "メモ上限対象" });
 
     await expect(updateCaseMemo("case-memo-3", "あ".repeat(5001))).rejects.toThrow();
+  });
+});
+
+describe("updateCase", () => {
+  it("案件名・管理番号・技術分野を更新する", async () => {
+    await db.insert(cases).values({
+      id: "case-edit-1",
+      name: "旧案件名",
+      referenceNumber: "OLD-001",
+      technicalField: "旧分野",
+    });
+
+    await updateCase("case-edit-1", {
+      name: "新案件名",
+      referenceNumber: "NEW-001",
+      technicalField: "新分野",
+    });
+
+    const rows = await db.select().from(cases).where(eq(cases.id, "case-edit-1"));
+    expect(rows[0]).toMatchObject({
+      name: "新案件名",
+      referenceNumber: "NEW-001",
+      technicalField: "新分野",
+    });
+  });
+
+  it("案件名が空文字のとき例外を投げ、DBを更新しない", async () => {
+    await db.insert(cases).values({ id: "case-edit-2", name: "元の名前" });
+
+    await expect(
+      updateCase("case-edit-2", { name: "", referenceNumber: "", technicalField: "" }),
+    ).rejects.toThrow();
+
+    const rows = await db.select().from(cases).where(eq(cases.id, "case-edit-2"));
+    expect(rows[0].name).toBe("元の名前");
+  });
+
+  it("案件名が201文字のとき例外を投げる", async () => {
+    await db.insert(cases).values({ id: "case-edit-3", name: "元の名前" });
+
+    await expect(updateCase("case-edit-3", { name: "あ".repeat(201) })).rejects.toThrow();
+  });
+
+  it("管理番号・技術分野を空文字にするとnullとして保存する", async () => {
+    await db.insert(cases).values({
+      id: "case-edit-4",
+      name: "更新対象",
+      referenceNumber: "REF-EXIST",
+      technicalField: "分野EXIST",
+    });
+
+    await updateCase("case-edit-4", {
+      name: "更新対象",
+      referenceNumber: "",
+      technicalField: "",
+    });
+
+    const rows = await db.select().from(cases).where(eq(cases.id, "case-edit-4"));
+    expect(rows[0].referenceNumber).toBeNull();
+    expect(rows[0].technicalField).toBeNull();
+  });
+
+  it("referenceNumber/technicalFieldを省略した場合はnullとして保存する", async () => {
+    await db.insert(cases).values({
+      id: "case-edit-5",
+      name: "更新対象2",
+      referenceNumber: "REF-EXIST-2",
+    });
+
+    await updateCase("case-edit-5", { name: "更新対象2（改）" });
+
+    const rows = await db.select().from(cases).where(eq(cases.id, "case-edit-5"));
+    expect(rows[0]).toMatchObject({
+      name: "更新対象2（改）",
+      referenceNumber: null,
+      technicalField: null,
+    });
+  });
+});
+
+describe("deleteCase", () => {
+  it("案件を削除し、/cases一覧へredirectする", async () => {
+    await db.insert(cases).values({ id: "case-delete-1", name: "削除対象" });
+
+    await expect(deleteCase("case-delete-1")).rejects.toMatchObject({
+      digest: expect.stringContaining("NEXT_REDIRECT"),
+    });
+    await expect(deleteCase("case-delete-1")).rejects.toMatchObject({
+      digest: expect.stringContaining("/cases"),
+    });
+
+    const rows = await db.select().from(cases).where(eq(cases.id, "case-delete-1"));
+    expect(rows).toHaveLength(0);
+  });
+
+  it("関連するsearch_terms・search_runs・case_patentsもカスケード削除される", async () => {
+    await db.insert(cases).values({ id: "case-delete-2", name: "削除対象2" });
+    await db.insert(patents).values({ id: "patent-delete-2", publicationNumber: "JP-DEL-2-A" });
+    await db.insert(searchTerms).values({
+      id: "term-delete-2",
+      caseId: "case-delete-2",
+      termType: "original",
+      text: "削除確認語",
+    });
+    await db.insert(searchRuns).values({
+      id: "run-delete-2",
+      caseId: "case-delete-2",
+      conditions: { dateFrom: "2020-01-01", dateTo: "2020-12-31", terms: ["削除確認語"] },
+      status: "success",
+      resultCount: 0,
+    });
+    await db.insert(casePatents).values({
+      caseId: "case-delete-2",
+      patentId: "patent-delete-2",
+      status: "important",
+    });
+
+    await expect(deleteCase("case-delete-2")).rejects.toMatchObject({
+      digest: expect.stringContaining("NEXT_REDIRECT"),
+    });
+
+    expect(await db.select().from(searchTerms).where(eq(searchTerms.caseId, "case-delete-2"))).toHaveLength(0);
+    expect(await db.select().from(searchRuns).where(eq(searchRuns.caseId, "case-delete-2"))).toHaveLength(0);
+    expect(
+      await db.select().from(casePatents).where(eq(casePatents.caseId, "case-delete-2")),
+    ).toHaveLength(0);
+  });
+
+  it("FK制約がないllm_logsも手動削除で除去される", async () => {
+    await db.insert(cases).values({ id: "case-delete-3", name: "削除対象3" });
+    await db.insert(llmLogs).values({
+      id: "log-delete-3",
+      kind: "expansion",
+      caseId: "case-delete-3",
+      requestPayload: "{}",
+      model: "test-model",
+    });
+
+    await expect(deleteCase("case-delete-3")).rejects.toMatchObject({
+      digest: expect.stringContaining("NEXT_REDIRECT"),
+    });
+
+    expect(await db.select().from(llmLogs).where(eq(llmLogs.caseId, "case-delete-3"))).toHaveLength(0);
+  });
+
+  it("存在しないcaseIdでも例外を投げずにredirectする（冪等）", async () => {
+    await expect(deleteCase("case-does-not-exist")).rejects.toMatchObject({
+      digest: expect.stringContaining("NEXT_REDIRECT"),
+    });
   });
 });

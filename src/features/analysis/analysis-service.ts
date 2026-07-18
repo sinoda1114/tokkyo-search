@@ -64,10 +64,14 @@ async function upsertAnalysis(
  *
  * 提供された本文にない情報を事実として出力しない・特許性や新規性を断定しないという制約は
  * `analyzePatent` 側のプロンプトで強制される。本関数は結果の再利用・保存の責務のみを持つ。
+ *
+ * `caseId` はどの案件の詳細画面から実行されたかをログ（`llm_logs.caseId`）に残すために
+ * `analyzePatent` へそのまま渡す（呼び出し元のAPIルートがURLから受け取って渡す）。
  */
 export async function getOrRunAnalysis(
   patentId: string,
   force = false,
+  caseId?: string,
 ): Promise<AnalysisResult | AnalysisErrorResult> {
   if (!force) {
     const { getAnalysisByPatentId } = await import("./queries");
@@ -90,6 +94,7 @@ export async function getOrRunAnalysis(
         claims: patent.claimsText,
       },
       patentId,
+      caseId,
     );
 
     await upsertAnalysis(patentId, { status: "success", result, errorMessage: null });

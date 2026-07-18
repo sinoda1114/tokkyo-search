@@ -30,8 +30,20 @@ async function seedCase(caseId: string): Promise<void> {
   await db.insert(cases).values({ id: caseId, name: "テスト案件" });
 }
 
-async function seedTerm(id: string, caseId: string, text: string): Promise<void> {
-  await db.insert(searchTerms).values({ id, caseId, termType: "original", text, source: "user" });
+async function seedTerm(
+  id: string,
+  caseId: string,
+  text: string,
+  options?: { parentTermId?: string; termType?: (typeof searchTerms.$inferInsert)["termType"] },
+): Promise<void> {
+  await db.insert(searchTerms).values({
+    id,
+    caseId,
+    termType: options?.termType ?? "original",
+    text,
+    source: options?.parentTermId ? "llm" : "user",
+    parentTermId: options?.parentTermId,
+  });
 }
 
 function buildPublicationRow(overrides: Record<string, unknown> = {}) {
@@ -48,6 +60,7 @@ function buildPublicationRow(overrides: Record<string, unknown> = {}) {
     ipc_codes: ["H01L23/00"],
     cpc_codes: ["H01L23/00"],
     cited_publications: ["JP1999-000001A"],
+    total_match_count: 1,
     ...overrides,
   };
 }
@@ -121,8 +134,9 @@ describe("runSearch", () => {
     expect(runTermRows[0].searchTermId).toBe("term-1");
   });
 
-  it("query-builderに渡す条件が正しく組み立てられる（termIdsから実テキストを解決する）", async () => {
+  it("query-builderに渡す条件が正しく組み立てられる（termIdsから実テキストを解決し、独立したルート語は別グループになる）", async () => {
     await seedCase("case-2");
+    // parentTermIdを持たない語は互いに独立したルート＝別グループとして扱われる。
     await seedTerm("term-a", "case-2", "半導体");
     await seedTerm("term-b", "case-2", "放熱構造");
     runSearchQueryMock.mockResolvedValue({ rows: [], totalBytesProcessed: 0 });
@@ -143,7 +157,7 @@ describe("runSearch", () => {
     const expectedQuery = buildSearchQuery("test-project", "patents_jp", {
       dateFrom: "2010-01-01",
       dateTo: "2020-01-01",
-      terms: ["半導体", "放熱構造"],
+      termGroups: [["半導体"], ["放熱構造"]],
       searchClaims: true,
       assignee: "テスト工業",
       ipcPrefix: "H01L",
@@ -290,5 +304,157 @@ describe("runSearch", () => {
       .from(searchResults)
       .where(eq(searchResults.searchRunId, result.searchRunId));
     expect(resultRows[0].matchedTerms).toEqual(["半導体"]);
+  });
+
+  describe("検索語のグループ化（parentTermIdによるAND検索）", () => {
+    it("parentTermIdで同じルートを持つ選択語は1つのグループ（OR）にまとめられる", async () => {
+      await seedCase("case-8");
+      await seedTerm("root-8", "case-8", "半導体");
+      await seedTerm("child-8", "case-8", "セミコンダクタ", {
+        parentTermId: "root-8",
+        termType: "synonym",
+      });
+      runSearchQueryMock.mockResolvedValue({ rows: [], totalBytesProcessed: 0 });
+
+      await runSearch({
+        caseId: "case-8",
+        termIds: ["root-8", "child-8"],
+        dateFrom: "2000-01-01",
+        dateTo: "2024-12-31",
+      });
+
+      const calledQuery = runSearchQueryMock.mock.calls[0][0];
+      const expectedQuery = buildSearchQuery("test-project", "patents_jp", {
+        dateFrom: "2000-01-01",
+        dateTo: "2024-12-31",
+        termGroups: [["半導体", "セミコンダクタ"]],
+      });
+      expect(calledQuery.sql).toBe(expectedQuery.sql);
+      expect(calledQuery.params.pattern0).toBe("(半導体|セミコンダクタ)");
+      expect(calledQuery.params.pattern1).toBeUndefined();
+    });
+
+    it("親子関係のない2つのルート語は別グループ（AND）になる", async () => {
+      await seedCase("case-9");
+      await seedTerm("root-9a", "case-9", "放熱構造");
+      await seedTerm("root-9b", "case-9", "半導体パッケージ");
+      runSearchQueryMock.mockResolvedValue({ rows: [], totalBytesProcessed: 0 });
+
+      await runSearch({
+        caseId: "case-9",
+        termIds: ["root-9a", "root-9b"],
+        dateFrom: "2000-01-01",
+        dateTo: "2024-12-31",
+      });
+
+      const calledQuery = runSearchQueryMock.mock.calls[0][0];
+      expect(calledQuery.params.pattern0).toBe("放熱構造");
+      expect(calledQuery.params.pattern1).toBe("半導体パッケージ");
+    });
+
+    it("孫語（parentTermIdが2階層先）も最終的なルートのグループにまとめられる", async () => {
+      await seedCase("case-10");
+      await seedTerm("root-10", "case-10", "放熱構造");
+      await seedTerm("child-10", "case-10", "放熱機構", {
+        parentTermId: "root-10",
+        termType: "synonym",
+      });
+      await seedTerm("grandchild-10", "case-10", "heat dissipation structure", {
+        parentTermId: "child-10",
+        termType: "english",
+      });
+      runSearchQueryMock.mockResolvedValue({ rows: [], totalBytesProcessed: 0 });
+
+      await runSearch({
+        caseId: "case-10",
+        termIds: ["root-10", "grandchild-10"],
+        dateFrom: "2000-01-01",
+        dateTo: "2024-12-31",
+      });
+
+      const calledQuery = runSearchQueryMock.mock.calls[0][0];
+      expect(calledQuery.params.pattern0).toBe("(放熱構造|heat dissipation structure)");
+      expect(calledQuery.params.pattern1).toBeUndefined();
+    });
+
+    it("片方のグループの語だけを選択解除すると、残ったグループだけでAND検索する", async () => {
+      await seedCase("case-11");
+      await seedTerm("root-11a", "case-11", "放熱構造");
+      await seedTerm("root-11b", "case-11", "半導体パッケージ");
+      runSearchQueryMock.mockResolvedValue({ rows: [], totalBytesProcessed: 0 });
+
+      // root-11bだけを選択（root-11aのグループは対象から外れている想定）
+      await runSearch({
+        caseId: "case-11",
+        termIds: ["root-11b"],
+        dateFrom: "2000-01-01",
+        dateTo: "2024-12-31",
+      });
+
+      const calledQuery = runSearchQueryMock.mock.calls[0][0];
+      expect(calledQuery.params.pattern0).toBe("半導体パッケージ");
+      expect(calledQuery.params.pattern1).toBeUndefined();
+    });
+  });
+
+  describe("総ヒット件数（total_match_count）の保存", () => {
+    it("BigQueryが返したtotal_match_countをsearchRuns.conditions.totalMatchCountとして保存する", async () => {
+      await seedCase("case-12");
+      await seedTerm("term-12", "case-12", "半導体");
+      runSearchQueryMock.mockResolvedValue({
+        rows: [
+          buildPublicationRow({ publication_number: "JP-X", total_match_count: 250 }),
+          buildPublicationRow({ publication_number: "JP-Y", total_match_count: 250 }),
+        ],
+        totalBytesProcessed: 999,
+      });
+
+      const result = await runSearch({
+        caseId: "case-12",
+        termIds: ["term-12"],
+        dateFrom: "2000-01-01",
+        dateTo: "2024-12-31",
+      });
+
+      const runRows = await db.select().from(searchRuns).where(eq(searchRuns.id, result.searchRunId));
+      const conditions = runRows[0].conditions as { totalMatchCount?: number };
+      expect(conditions.totalMatchCount).toBe(250);
+    });
+
+    it("検索結果が0件のとき、totalMatchCountは0として保存する", async () => {
+      await seedCase("case-13");
+      await seedTerm("term-13", "case-13", "半導体");
+      runSearchQueryMock.mockResolvedValue({ rows: [], totalBytesProcessed: 0 });
+
+      const result = await runSearch({
+        caseId: "case-13",
+        termIds: ["term-13"],
+        dateFrom: "2000-01-01",
+        dateTo: "2024-12-31",
+      });
+
+      const runRows = await db.select().from(searchRuns).where(eq(searchRuns.id, result.searchRunId));
+      const conditions = runRows[0].conditions as { totalMatchCount?: number };
+      expect(conditions.totalMatchCount).toBe(0);
+    });
+
+    it("BigQueryが返す個々のtotal_match_countの値をそのまま採用する（2回目のカウント専用クエリは発行しない）", async () => {
+      await seedCase("case-14");
+      await seedTerm("term-14", "case-14", "半導体");
+      runSearchQueryMock.mockResolvedValue({
+        rows: [buildPublicationRow({ total_match_count: 3 })],
+        totalBytesProcessed: 1,
+      });
+
+      await runSearch({
+        caseId: "case-14",
+        termIds: ["term-14"],
+        dateFrom: "2000-01-01",
+        dateTo: "2024-12-31",
+      });
+
+      // 本体検索とカウントを1回のBigQueryクエリで済ませる設計であることの確認。
+      expect(runSearchQueryMock).toHaveBeenCalledTimes(1);
+    });
   });
 });

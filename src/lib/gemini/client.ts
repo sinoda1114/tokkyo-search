@@ -228,10 +228,15 @@ export async function generateExpansion(
  * 特許文献（title/abstract/claims）を解析し、概要・背景技術・課題・解決手段・効果等を構造化抽出する。
  * 提供された本文にない内容を事実として出力させず、特許性・新規性・進歩性の断定もさせない
  * （プロンプト側で強制し、結果はZodで再検証する）。
+ *
+ * `caseId` はどの案件の詳細画面から実行された解析かをログ（`llm_logs.caseId`）に残すために渡す。
+ * 案件詳細のAI送受信ログ一覧は `caseId` 一致で抽出するため、これを渡さないとログが永遠に表示されない
+ * （呼び出し元は `getOrRunAnalysis` 経由でAPIルートのURLから受け取ったcaseIdを渡すこと）。
  */
 export async function analyzePatent(
   patent: AnalysisPatentInput,
   patentId?: string,
+  caseId?: string,
 ): Promise<AnalysisResult> {
   if (isMockExternalApisEnabled()) {
     return MOCK_ANALYSIS_RESULT;
@@ -248,6 +253,7 @@ export async function analyzePatent(
     await logBestEffort({
       kind: "analysis",
       patentId,
+      caseId,
       requestPayload,
       responsePayload,
       model: env.GEMINI_MODEL,
@@ -257,6 +263,7 @@ export async function analyzePatent(
     await logBestEffort({
       kind: "analysis",
       patentId,
+      caseId,
       requestPayload: prompt,
       model: env.GEMINI_MODEL,
     });

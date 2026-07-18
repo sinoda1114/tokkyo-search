@@ -66,6 +66,7 @@ const MOCK_SEARCH_ROW = {
   ipc_codes: ["H01L23/34"],
   cpc_codes: ["H01L23/34"],
   cited_publications: ["JP2015-000123A"],
+  total_match_count: 1,
 };
 
 const MOCK_ESTIMATED_BYTES = 1_000_000;
