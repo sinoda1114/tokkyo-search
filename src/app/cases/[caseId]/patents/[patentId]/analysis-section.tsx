@@ -14,6 +14,8 @@ interface AnalysisSectionProps {
   caseId: string;
   patentId: string;
   initialAnalysis: AnalysisState;
+  /** 請求項全文（`patents.claimsText`）が取得済みかどうか。解析の案内文言の出し分けに使う。 */
+  hasClaimsText: boolean;
 }
 
 interface AnalysisApiErrorBody {
@@ -44,23 +46,38 @@ const TEXT_FIELDS: Array<{
 const FETCH_ERROR_MESSAGE = "AI解析の実行に失敗しました。時間をおいて再度お試しください。";
 const AI_LIMITATION_NOTICE =
   "この解析結果はAIが本文から抽出した要約です。特許性・新規性・進歩性の判断結果ではありません。";
+const CLAIMS_MISSING_NOTICE =
+  "請求項が未取得のため、要約のみで解析します（先に請求項を取得すると精度が上がる場合があります）。";
+const CLAIMS_AVAILABLE_REMINDER =
+  "請求項を取得済みです。請求項を含めて解析し直せます。";
 
 /**
  * AI文献解析セクション。
  * 未解析なら実行ボタンを表示し、`/api/patents/[patentId]/analysis` をPOSTして結果を取得する。
  * 既存の解析結果があれば `initialAnalysis` としてサーバーから渡され、即座に表示する。
+ *
+ * `hasClaimsText` は請求項の取得状況を伝えるプロパティで、`page.tsx` からサーバー側の
+ * `patent.claimsText` に基づいて渡される。請求項セクションで新たに請求項を取得すると
+ * `router.refresh()` が呼ばれ、このpropが更新される（`claims-section.tsx` 参照）。
+ * `claimsIncludedInResult` は「現在表示中の解析結果が請求項ありの状態で実行されたか」を
+ * このセッション内で追跡するためのローカル状態（DBには保存しない。`patent_analyses` の
+ * スキーマは変更しない方針のため、再解析を促す案内はクライアント側の推定に留める）。
  */
-export function AnalysisSection({ caseId, patentId, initialAnalysis }: AnalysisSectionProps) {
+export function AnalysisSection({ caseId, patentId, initialAnalysis, hasClaimsText }: AnalysisSectionProps) {
   const [analysis, setAnalysis] = useState<AnalysisState>(initialAnalysis);
   const [isLoading, setIsLoading] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [claimsIncludedInResult, setClaimsIncludedInResult] = useState(false);
 
   async function runAnalysis(force: boolean) {
     setIsLoading(true);
     setFetchError(null);
     try {
-      const query = force ? "?force=true" : "";
-      const response = await fetch(`/api/patents/${patentId}/analysis${query}`, {
+      const params = new URLSearchParams({ caseId });
+      if (force) {
+        params.set("force", "true");
+      }
+      const response = await fetch(`/api/patents/${patentId}/analysis?${params.toString()}`, {
         method: "POST",
       });
       if (!response.ok) {
@@ -72,6 +89,7 @@ export function AnalysisSection({ caseId, patentId, initialAnalysis }: AnalysisS
         setAnalysis({ status: "error", errorMessage: json.errorMessage });
       } else {
         setAnalysis({ status: "success", result: json as AnalysisResult });
+        setClaimsIncludedInResult(hasClaimsText);
       }
     } catch {
       setFetchError(FETCH_ERROR_MESSAGE);
@@ -79,6 +97,8 @@ export function AnalysisSection({ caseId, patentId, initialAnalysis }: AnalysisS
       setIsLoading(false);
     }
   }
+
+  const showClaimsReminder = hasClaimsText && !claimsIncludedInResult;
 
   return (
     <section className="flex flex-col gap-3 rounded-[var(--radius)] border border-[var(--border)] p-4">
@@ -94,6 +114,8 @@ export function AnalysisSection({ caseId, patentId, initialAnalysis }: AnalysisS
           caseId={caseId}
           analysis={analysis}
           fetchError={fetchError}
+          hasClaimsText={hasClaimsText}
+          showClaimsReminder={showClaimsReminder}
           onRun={() => runAnalysis(false)}
           onRerun={() => runAnalysis(true)}
         />
@@ -106,15 +128,26 @@ interface AnalysisBodyProps {
   caseId: string;
   analysis: AnalysisState;
   fetchError: string | null;
+  hasClaimsText: boolean;
+  showClaimsReminder: boolean;
   onRun: () => void;
   onRerun: () => void;
 }
 
-function AnalysisBody({ caseId, analysis, fetchError, onRun, onRerun }: AnalysisBodyProps) {
+function AnalysisBody({
+  caseId,
+  analysis,
+  fetchError,
+  hasClaimsText,
+  showClaimsReminder,
+  onRun,
+  onRerun,
+}: AnalysisBodyProps) {
   if (analysis === null) {
     return (
       <>
         {fetchError && <ErrorAlert message={fetchError} />}
+        {!hasClaimsText && <NoticeAlert message={CLAIMS_MISSING_NOTICE} />}
         <Button type="button" variant="secondary" size="sm" onPress={onRun}>
           AI解析を実行
         </Button>
@@ -127,6 +160,7 @@ function AnalysisBody({ caseId, analysis, fetchError, onRun, onRerun }: Analysis
       <>
         <ErrorAlert message={analysis.errorMessage} />
         {fetchError && <ErrorAlert message={fetchError} />}
+        {!hasClaimsText && <NoticeAlert message={CLAIMS_MISSING_NOTICE} />}
         <Button type="button" variant="secondary" size="sm" onPress={onRerun}>
           再実行
         </Button>
@@ -139,8 +173,19 @@ function AnalysisBody({ caseId, analysis, fetchError, onRun, onRerun }: Analysis
       caseId={caseId}
       result={analysis.result}
       fetchError={fetchError}
+      showClaimsReminder={showClaimsReminder}
       onRerun={onRerun}
     />
+  );
+}
+
+function NoticeAlert({ message }: { message: string }) {
+  return (
+    <Alert status="accent">
+      <Alert.Content>
+        <Alert.Description>{message}</Alert.Description>
+      </Alert.Content>
+    </Alert>
   );
 }
 
@@ -158,10 +203,17 @@ interface AnalysisResultViewProps {
   caseId: string;
   result: AnalysisResult;
   fetchError: string | null;
+  showClaimsReminder: boolean;
   onRerun: () => void;
 }
 
-function AnalysisResultView({ caseId, result, fetchError, onRerun }: AnalysisResultViewProps) {
+function AnalysisResultView({
+  caseId,
+  result,
+  fetchError,
+  showClaimsReminder,
+  onRerun,
+}: AnalysisResultViewProps) {
   return (
     <div className="flex flex-col gap-4">
       <Alert status="warning">
@@ -171,6 +223,7 @@ function AnalysisResultView({ caseId, result, fetchError, onRerun }: AnalysisRes
       </Alert>
 
       {fetchError && <ErrorAlert message={fetchError} />}
+      {showClaimsReminder && <NoticeAlert message={CLAIMS_AVAILABLE_REMINDER} />}
 
       {TEXT_FIELDS.map(({ key, label }) => (
         <div key={key} className="flex flex-col gap-1">
@@ -191,7 +244,7 @@ function AnalysisResultView({ caseId, result, fetchError, onRerun }: AnalysisRes
       <ResearchCandidatesPanel caseId={caseId} analysis={result} />
 
       <Button type="button" variant="secondary" size="sm" onPress={onRerun}>
-        再実行
+        {showClaimsReminder ? "請求項を含めて再解析" : "再実行"}
       </Button>
     </div>
   );

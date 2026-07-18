@@ -103,6 +103,7 @@ describe("getOrRunAnalysis", () => {
     expect(analyzePatentMock).toHaveBeenCalledWith(
       { title: "発明の名称", abstract: "要約文", claims: "請求項全文" },
       "patent-3",
+      undefined,
     );
 
     const rows = await db.select().from(patentAnalyses).where(eq(patentAnalyses.patentId, "patent-3"));
@@ -127,6 +128,7 @@ describe("getOrRunAnalysis", () => {
     expect(analyzePatentMock).toHaveBeenCalledWith(
       { title: "発明の名称", abstract: null, claims: null },
       "patent-4",
+      undefined,
     );
   });
 
@@ -182,5 +184,18 @@ describe("getOrRunAnalysis", () => {
 
     expect(result).toEqual({ status: "error", errorMessage: "特許が見つかりません" });
     expect(analyzePatentMock).not.toHaveBeenCalled();
+  });
+
+  it("caseIdを渡した場合、analyzePatentへそのままcaseIdを渡す（llm_logsにcaseIdを残すため）", async () => {
+    await insertPatent("patent-8");
+    analyzePatentMock.mockResolvedValue(sampleResult);
+
+    await getOrRunAnalysis("patent-8", false, "case-123");
+
+    expect(analyzePatentMock).toHaveBeenCalledWith(
+      { title: "発明の名称", abstract: "要約文", claims: "請求項全文" },
+      "patent-8",
+      "case-123",
+    );
   });
 });

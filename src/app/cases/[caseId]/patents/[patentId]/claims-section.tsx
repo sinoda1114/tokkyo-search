@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { Alert, Button, Heading, Paragraph, Spinner } from "@heroui/react";
 import { loadClaims } from "@/features/patents/actions";
 
@@ -13,8 +14,13 @@ interface ClaimsSectionProps {
  * 請求項セクション。
  * `claimsText` が未取得の場合はボタンを表示し、押下時にServer Action経由で
  * BigQueryから請求項全文を取得する（取得成功時はDB側にもキャッシュされる）。
+ *
+ * 請求項が新たに取得できた場合は `router.refresh()` でページのServer Component部分
+ * （`page.tsx`）を再取得する。これにより兄弟コンポーネントの `AnalysisSection` が
+ * 最新の `hasClaimsText` を受け取り、「請求項を含めて解析し直せます」の案内を出せるようになる。
  */
 export function ClaimsSection({ patentId, initialClaimsText }: ClaimsSectionProps) {
+  const router = useRouter();
   const [claimsText, setClaimsText] = useState(initialClaimsText);
   const [hasFetched, setHasFetched] = useState(false);
   const [isPending, startTransition] = useTransition();
@@ -24,6 +30,9 @@ export function ClaimsSection({ patentId, initialClaimsText }: ClaimsSectionProp
       const result = await loadClaims(patentId);
       setClaimsText(result.claimsText);
       setHasFetched(true);
+      if (result.claimsText) {
+        router.refresh();
+      }
     });
   }
 

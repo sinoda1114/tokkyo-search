@@ -9,6 +9,7 @@ vi.mock("@/db/client", async () => {
 import {
   addResearchTerms,
   addSearchTerms,
+  deleteSearchTerm,
   saveSelectedExpansions,
 } from "@/features/search-terms/actions";
 import { db } from "@/db/client";
@@ -113,6 +114,125 @@ describe("saveSelectedExpansions", () => {
     const result = await saveSelectedExpansions("case-7", []);
 
     expect(result.insertedCount).toBe(0);
+  });
+
+  it("sourceTermに一致する既存の検索語をparentTermIdとして紐づける（概念グループ化）", async () => {
+    await seedCase("case-12");
+    const [original] = await db
+      .insert(searchTerms)
+      .values({ id: "original-1", caseId: "case-12", termType: "original", text: "半導体", source: "user" })
+      .returning();
+
+    await saveSelectedExpansions("case-12", [
+      { type: "synonym", text: "セミコンダクタ", sourceTerm: "半導体" },
+    ]);
+
+    const rows = await db
+      .select()
+      .from(searchTerms)
+      .where(eq(searchTerms.caseId, "case-12"));
+    const child = rows.find((r) => r.text === "セミコンダクタ");
+    expect(child?.parentTermId).toBe(original.id);
+  });
+
+  it("sourceTermに一致する既存の検索語が見つからない場合、parentTermIdはnullのまま保存する", async () => {
+    await seedCase("case-13");
+
+    await saveSelectedExpansions("case-13", [
+      { type: "synonym", text: "セミコンダクタ", sourceTerm: "存在しない語" },
+    ]);
+
+    const rows = await db.select().from(searchTerms).where(eq(searchTerms.caseId, "case-13"));
+    expect(rows[0]?.parentTermId).toBeNull();
+  });
+
+  it("他案件に同一テキストの検索語があってもparentTermIdとして紐づけない", async () => {
+    await seedCase("case-14a");
+    await seedCase("case-14b");
+    await db
+      .insert(searchTerms)
+      .values({ id: "other-case-term", caseId: "case-14a", termType: "original", text: "半導体", source: "user" });
+
+    await saveSelectedExpansions("case-14b", [
+      { type: "synonym", text: "セミコンダクタ", sourceTerm: "半導体" },
+    ]);
+
+    const rows = await db.select().from(searchTerms).where(eq(searchTerms.caseId, "case-14b"));
+    expect(rows[0]?.parentTermId).toBeNull();
+  });
+});
+
+describe("deleteSearchTerm", () => {
+  it("指定した検索語を削除する", async () => {
+    await seedCase("case-20");
+    await db
+      .insert(searchTerms)
+      .values({ id: "term-20", caseId: "case-20", termType: "original", text: "半導体", source: "user" });
+
+    await deleteSearchTerm("case-20", "term-20");
+
+    const rows = await db.select().from(searchTerms).where(eq(searchTerms.caseId, "case-20"));
+    expect(rows).toHaveLength(0);
+  });
+
+  it("削除対象を親に持つ子の検索語もカスケードで削除する", async () => {
+    await seedCase("case-21");
+    await db.insert(searchTerms).values([
+      { id: "parent-21", caseId: "case-21", termType: "original", text: "半導体", source: "user" },
+      {
+        id: "child-21",
+        caseId: "case-21",
+        termType: "synonym",
+        text: "セミコンダクタ",
+        source: "llm",
+        parentTermId: "parent-21",
+      },
+      {
+        id: "grandchild-21",
+        caseId: "case-21",
+        termType: "english",
+        text: "semiconductor",
+        source: "llm",
+        parentTermId: "child-21",
+      },
+    ]);
+
+    await deleteSearchTerm("case-21", "parent-21");
+
+    const rows = await db.select().from(searchTerms).where(eq(searchTerms.caseId, "case-21"));
+    expect(rows).toHaveLength(0);
+  });
+
+  it("兄弟の検索語には影響しない", async () => {
+    await seedCase("case-22");
+    await db.insert(searchTerms).values([
+      { id: "parent-22", caseId: "case-22", termType: "original", text: "半導体", source: "user" },
+      { id: "sibling-22", caseId: "case-22", termType: "original", text: "放熱構造", source: "user" },
+    ]);
+
+    await deleteSearchTerm("case-22", "parent-22");
+
+    const rows = await db.select().from(searchTerms).where(eq(searchTerms.caseId, "case-22"));
+    expect(rows.map((r) => r.id)).toEqual(["sibling-22"]);
+  });
+
+  it("他案件の検索語IDを指定しても削除しない（caseIdの一致を必須とする）", async () => {
+    await seedCase("case-23a");
+    await seedCase("case-23b");
+    await db
+      .insert(searchTerms)
+      .values({ id: "term-23", caseId: "case-23a", termType: "original", text: "半導体", source: "user" });
+
+    await deleteSearchTerm("case-23b", "term-23");
+
+    const rows = await db.select().from(searchTerms).where(eq(searchTerms.caseId, "case-23a"));
+    expect(rows).toHaveLength(1);
+  });
+
+  it("存在しないIDを指定してもエラーにならない", async () => {
+    await seedCase("case-24");
+
+    await expect(deleteSearchTerm("case-24", "no-such-term")).resolves.toBeUndefined();
   });
 });
 

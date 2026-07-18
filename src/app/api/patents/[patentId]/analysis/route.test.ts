@@ -60,7 +60,7 @@ describe("POST /api/patents/[patentId]/analysis", () => {
     expect(response.status).toBe(200);
     const json = await response.json();
     expect(json).toEqual({ overview: "概要" });
-    expect(getOrRunAnalysisMock).toHaveBeenCalledWith("patent-1", false);
+    expect(getOrRunAnalysisMock).toHaveBeenCalledWith("patent-1", false, undefined);
   });
 
   it("クエリでforce=trueが指定された場合、forceありでgetOrRunAnalysisを呼ぶ", async () => {
@@ -73,7 +73,7 @@ describe("POST /api/patents/[patentId]/analysis", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(getOrRunAnalysisMock).toHaveBeenCalledWith("patent-1", true);
+    expect(getOrRunAnalysisMock).toHaveBeenCalledWith("patent-1", true, undefined);
   });
 
   it("ボディでforce:trueが指定された場合も、forceありでgetOrRunAnalysisを呼ぶ", async () => {
@@ -86,7 +86,20 @@ describe("POST /api/patents/[patentId]/analysis", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(getOrRunAnalysisMock).toHaveBeenCalledWith("patent-1", true);
+    expect(getOrRunAnalysisMock).toHaveBeenCalledWith("patent-1", true, undefined);
+  });
+
+  it("クエリでcaseIdが指定された場合、getOrRunAnalysisへcaseIdを渡す", async () => {
+    getPatentByIdMock.mockResolvedValue({ id: "patent-1" });
+    getOrRunAnalysisMock.mockResolvedValue({ overview: "概要" });
+
+    const response = await POST(
+      buildRequest("http://localhost/api/patents/patent-1/analysis?caseId=case-1&force=true"),
+      buildContext("patent-1"),
+    );
+
+    expect(response.status).toBe(200);
+    expect(getOrRunAnalysisMock).toHaveBeenCalledWith("patent-1", true, "case-1");
   });
 
   it("getOrRunAnalysisがエラー結果を返した場合もそのままJSONで返す", async () => {

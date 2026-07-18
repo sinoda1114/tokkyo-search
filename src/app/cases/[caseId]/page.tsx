@@ -1,7 +1,9 @@
 import { notFound } from "next/navigation";
-import { Heading, Link, Paragraph } from "@heroui/react";
+import { Chip, Heading, Link, Paragraph } from "@heroui/react";
 import { getCaseById } from "@/features/cases/queries";
 import { getSearchRunsByCase } from "@/features/patent-search/queries";
+import { getSearchTermsByCase } from "@/features/search-terms/queries";
+import { TERM_TYPE_ORDER } from "@/features/search-terms/term-type-labels";
 import {
   getEvaluatedPatentsByCase,
   type EvaluatedPatentItem,
@@ -13,8 +15,12 @@ import {
 import { getLlmLogsByCase } from "@/features/llm-logs/queries";
 import type { CasePatentStatus } from "@/db/schema";
 import { formatBytesBilled as formatBytesBilledBase, formatDateTime } from "@/lib/format";
+import { CaseEditForm } from "./case-edit-form";
 import { CaseMemoEditor } from "./case-memo-editor";
 import { LlmLogsSection } from "./llm-logs-section";
+
+/** 検索語プレビューとして表示する件数の上限。 */
+const SEARCH_TERM_PREVIEW_LIMIT = 8;
 
 function formatBytesBilled(bytes: number | null): string {
   return formatBytesBilledBase(bytes, "-");
@@ -50,33 +56,56 @@ export default async function CaseDetailPage({ params }: CaseDetailPageProps) {
   }
 
   const searchRuns = await getSearchRunsByCase(caseItem.id);
+  const searchTermsByType = await getSearchTermsByCase(caseItem.id);
+  const searchTerms = TERM_TYPE_ORDER.flatMap((type) => searchTermsByType[type]);
   const evaluatedPatents = await getEvaluatedPatentsByCase(caseItem.id);
   const evaluatedByStatus = groupByStatus(evaluatedPatents);
   const llmLogs = await getLlmLogsByCase(caseItem.id);
 
   return (
     <div className="flex flex-col gap-8">
-      <div>
-        <Heading level={1} className="text-balance">
-          {caseItem.name}
-        </Heading>
-        <dl className="mt-3 grid grid-cols-[max-content_1fr] gap-x-6 gap-y-1 text-sm">
-          <dt className="text-[var(--muted,gray)]">管理番号</dt>
-          <dd className="text-pretty">{caseItem.referenceNumber ?? "未設定"}</dd>
-          <dt className="text-[var(--muted,gray)]">技術分野</dt>
-          <dd className="text-pretty">{caseItem.technicalField ?? "未設定"}</dd>
-        </dl>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0 flex-1">
+          <CaseEditForm
+            caseId={caseItem.id}
+            initialName={caseItem.name}
+            initialReferenceNumber={caseItem.referenceNumber}
+            initialTechnicalField={caseItem.technicalField}
+          />
+        </div>
+        <Link
+          href={`/api/cases/${caseItem.id}/export`}
+          download
+          className="shrink-0 rounded-[var(--radius)] border border-[var(--border)] px-3 py-1.5 text-sm no-underline"
+        >
+          CSVエクスポート
+        </Link>
       </div>
 
       <CaseMemoEditor caseId={caseItem.id} initialMemo={caseItem.memo} />
 
       <section className="flex flex-col gap-2 rounded-[var(--radius)] border border-[var(--border)] p-4">
         <Heading level={2} className="text-balance">
-          検索語
+          検索語（<span className="tabular-nums">{searchTerms.length}</span>件）
         </Heading>
-        <Paragraph color="muted" className="text-pretty">
-          検索語を登録してください。
-        </Paragraph>
+        {searchTerms.length === 0 ? (
+          <Paragraph color="muted" className="text-pretty">
+            検索語を登録してください。
+          </Paragraph>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {searchTerms.slice(0, SEARCH_TERM_PREVIEW_LIMIT).map((term) => (
+              <Chip key={term.id} size="sm">
+                {term.text}
+              </Chip>
+            ))}
+            {searchTerms.length > SEARCH_TERM_PREVIEW_LIMIT ? (
+              <Chip size="sm" color="accent">
+                他{searchTerms.length - SEARCH_TERM_PREVIEW_LIMIT}件
+              </Chip>
+            ) : null}
+          </div>
+        )}
         <Link href={`/cases/${caseItem.id}/terms`}>検索語の管理へ進む</Link>
       </section>
 

@@ -4,7 +4,7 @@ import { useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Alert, Button, Checkbox, Heading, Input, Label, Paragraph, Spinner, TextField } from "@heroui/react";
 import { getLocalTimeZone, today } from "@internationalized/date";
-import type { SearchTermsByType } from "@/features/search-terms/queries";
+import type { SearchTermsByType, SearchTermRow } from "@/features/search-terms/queries";
 import { TERM_TYPE_LABELS, TERM_TYPE_ORDER } from "@/features/search-terms/term-type-labels";
 import { collectFieldErrors, searchRequestSchema } from "@/features/patent-search/validation";
 import { DateRangeField } from "./date-range-field";
@@ -28,6 +28,13 @@ interface SelectableTerm {
   label: string;
 }
 
+/** 概念グループ（先行技術調査のAND検索単位）。ルート語（`parentTermId`がnullの語）ごとにまとまる。 */
+interface TermGroup {
+  rootId: string;
+  rootLabel: string;
+  terms: SelectableTerm[];
+}
+
 type SubmitState = { status: "idle" } | { status: "loading" } | { status: "error"; message: string };
 
 interface TouchedFields {
@@ -38,14 +45,51 @@ interface TouchedFields {
 
 const INITIAL_TOUCHED: TouchedFields = { termIds: false, dateFrom: false, dateTo: false };
 
-function flattenTerms(termsByType: SearchTermsByType): SelectableTerm[] {
-  const result: SelectableTerm[] = [];
+/**
+ * `parentTermId`をルート（`parentTermId`がnullの語）まで辿り、そのルートのidを返す。
+ * `search-service.ts`の`resolveRootId`とロジックを揃えている（検索実行時のグループ化と
+ * 画面上のグループ表示を一致させるため）。
+ */
+function resolveRootId(term: SearchTermRow, byId: Map<string, SearchTermRow>): string {
+  let current: SearchTermRow = term;
+  const visited = new Set<string>([current.id]);
+  while (current.parentTermId) {
+    const parent = byId.get(current.parentTermId);
+    if (!parent || visited.has(parent.id)) {
+      break;
+    }
+    visited.add(parent.id);
+    current = parent;
+  }
+  return current.id;
+}
+
+/**
+ * 検索語を概念グループ（ルートが同じもの同士）にセクション分けする。
+ * グループ・グループ内の語の順序は、いずれも既存の`TERM_TYPE_ORDER`表示順に従う。
+ */
+function groupTerms(termsByType: SearchTermsByType): TermGroup[] {
+  const allTerms: SearchTermRow[] = TERM_TYPE_ORDER.flatMap((type) => termsByType[type]);
+  const byId = new Map(allTerms.map((term) => [term.id, term]));
+
+  const groupOrder: string[] = [];
+  const groups = new Map<string, TermGroup>();
+
   for (const type of TERM_TYPE_ORDER) {
     for (const term of termsByType[type]) {
-      result.push({ id: term.id, label: `[${TERM_TYPE_LABELS[type]}] ${term.text}` });
+      const rootId = resolveRootId(term, byId);
+      if (!groups.has(rootId)) {
+        groupOrder.push(rootId);
+        groups.set(rootId, { rootId, rootLabel: byId.get(rootId)?.text ?? term.text, terms: [] });
+      }
+      groups.get(rootId)!.terms.push({
+        id: term.id,
+        label: `[${TERM_TYPE_LABELS[type]}] ${term.text}`,
+      });
     }
   }
-  return result;
+
+  return groupOrder.map((rootId) => groups.get(rootId)!);
 }
 
 function extractErrorMessage(json: unknown): string {
@@ -62,7 +106,11 @@ function extractErrorMessage(json: unknown): string {
 
 export function SearchExecutionPanel({ caseId, termsByType }: SearchExecutionPanelProps) {
   const router = useRouter();
-  const selectableTerms = flattenTerms(termsByType);
+  const termGroups = useMemo(() => groupTerms(termsByType), [termsByType]);
+  const selectableTerms = useMemo(
+    () => termGroups.flatMap((group) => group.terms),
+    [termGroups],
+  );
   // 「除外した語のID」だけを保持する設計にすることで、新しく登録・AI展開で追加された検索語は
   // 何もしなくても自動的に選択済み（検索対象）になる。ユーザーが個別に外した語だけ覚えておく。
   const [deselectedTermIds, setDeselectedTermIds] = useState<Set<string>>(new Set());
@@ -196,22 +244,32 @@ export function SearchExecutionPanel({ caseId, termsByType }: SearchExecutionPan
           className="flex flex-col gap-2"
         >
           <Paragraph size="sm" color="muted">
-            検索に使う検索語
+            検索に使う検索語（グループ内はOR、グループ間はANDで検索します。展開元の語ごとにグループ分けされています）
           </Paragraph>
-          <div className="flex flex-wrap gap-3">
-            {selectableTerms.map((term) => (
-              <Checkbox
-                key={term.id}
-                isSelected={!deselectedTermIds.has(term.id)}
-                onChange={(checked) => toggleTerm(term.id, checked)}
+          <div className="flex flex-col gap-3">
+            {termGroups.map((group) => (
+              <div
+                key={group.rootId}
+                className="flex flex-col gap-2 rounded-[var(--radius)] border border-[var(--border)] p-3"
               >
-                <Checkbox.Content>
-                  <Checkbox.Control>
-                    <Checkbox.Indicator />
-                  </Checkbox.Control>
-                  <Label>{term.label}</Label>
-                </Checkbox.Content>
-              </Checkbox>
+                <Heading level={3}>{group.rootLabel}</Heading>
+                <div className="flex flex-wrap gap-3">
+                  {group.terms.map((term) => (
+                    <Checkbox
+                      key={term.id}
+                      isSelected={!deselectedTermIds.has(term.id)}
+                      onChange={(checked) => toggleTerm(term.id, checked)}
+                    >
+                      <Checkbox.Content>
+                        <Checkbox.Control>
+                          <Checkbox.Indicator />
+                        </Checkbox.Control>
+                        <Label>{term.label}</Label>
+                      </Checkbox.Content>
+                    </Checkbox>
+                  ))}
+                </div>
+              </div>
             ))}
           </div>
           {termsErrorVisible ? (

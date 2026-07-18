@@ -26,23 +26,39 @@ const SEARCH_COLUMNS = [
   "ARRAY(SELECT DISTINCT c FROM UNNEST(ipc_codes) AS c) AS ipc_codes",
   "ARRAY(SELECT DISTINCT c FROM UNNEST(cpc_codes) AS c) AS cpc_codes",
   "cited_publications",
+  // LIMITで打ち切られる前の総ヒット件数をウィンドウ関数で同一クエリ内に含める。
+  // 件数だけを数えるための別クエリを発行するとスキャンコストが二重に発生するため、
+  // 必ずこの1クエリで本体の検索結果と総件数の両方を取得すること。
+  "COUNT(*) OVER() AS total_match_count",
 ] as const;
 
-const RESULT_LIMIT = 200;
+export const RESULT_LIMIT = 200;
 
 export interface SearchConditions {
   /** 検索対象の下限日（'YYYY-MM-DD'、必須）。パーティションプルーニングのガードとして必須。 */
   dateFrom: string;
   /** 検索対象の上限日（'YYYY-MM-DD'、必須）。 */
   dateTo: string;
-  /** 検索語（1件以上必須）。正規表現の特殊文字はリテラルとして扱われる。 */
-  terms: string[];
+  /**
+   * 検索語グループ（先行技術調査における概念グループ化）。
+   * 外側の配列＝グループ（グループ間はAND結合）、内側の配列＝グループ内の語（OR結合）。
+   * 例: [["放熱","冷却","ヒートシンク"], ["半導体パッケージ","電子部品"]]
+   *   → (放熱 OR 冷却 OR ヒートシンク) AND (半導体パッケージ OR 電子部品)
+   * グループが1つだけの場合は従来どおりの単純なOR検索になる。
+   * 正規表現の特殊文字はリテラルとして扱われる。
+   */
+  termGroups: string[][];
   /** 請求項（claims_ja）も検索対象に含めるか。デフォルトfalse。 */
   searchClaims?: boolean;
   /** 出願人の部分一致（任意）。 */
   assignee?: string;
   /** IPC前方一致（任意）。 */
   ipcPrefix?: string;
+  /**
+   * 総ヒット件数（LIMIT適用前）。クエリ組み立てへの入力ではなく、実行結果を
+   * `search_runs.conditions` へ保存する際に一緒に記録するための出力用フィールド。
+   */
+  totalMatchCount?: number;
 }
 
 export interface BuiltQuery {
@@ -72,13 +88,18 @@ function escapeRegexLiteral(term: string): string {
   return term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-function buildTermsPattern(terms: string[]): string {
-  const normalized = terms.map((term) => term.trim()).filter((term) => term.length > 0);
-  if (normalized.length === 0) {
-    throw new Error("terms は1件以上指定してください");
-  }
+/** グループ内の語をトリム・空文字除去したうえで正規表現のORパターンへ変換する。 */
+function buildGroupPattern(group: string[]): string {
+  const normalized = group.map((term) => term.trim()).filter((term) => term.length > 0);
   const escaped = normalized.map(escapeRegexLiteral);
   return escaped.length === 1 ? escaped[0] : `(${escaped.join("|")})`;
+}
+
+/** 各グループをトリム・空文字除去し、語が1件も残らない空グループ自体を落とす。 */
+function normalizeTermGroups(termGroups: string[][]): string[][] {
+  return termGroups
+    .map((group) => group.map((term) => term.trim()).filter((term) => term.length > 0))
+    .filter((group) => group.length > 0);
 }
 
 /** LIKE述語に使うため、パーセント・アンダースコア・バックスラッシュをエスケープする。 */
@@ -107,26 +128,39 @@ export function buildSearchQuery(
   if (conditions.dateFrom > conditions.dateTo) {
     throw new Error("dateFrom は dateTo 以前の日付を指定してください");
   }
-  const pattern = buildTermsPattern(conditions.terms);
+  const normalizedGroups = normalizeTermGroups(conditions.termGroups);
+  if (normalizedGroups.length === 0) {
+    throw new Error("termGroups は1件以上、各グループに1件以上の検索語を指定してください");
+  }
+  const groupPatterns = normalizedGroups.map(buildGroupPattern);
   const searchClaims = conditions.searchClaims ?? false;
 
   const params: Record<string, unknown> = {
     dateFrom: conditions.dateFrom,
     dateTo: conditions.dateTo,
-    pattern,
     searchClaims,
   };
+  groupPatterns.forEach((pattern, index) => {
+    params[`pattern${index}`] = pattern;
+  });
+
+  // グループ間はAND、グループ内（同一 @patternN）はOR。1グループのみのときは
+  // 従来の単純なOR検索（`buildTermsPattern`相当）と同じ挙動になる。
+  const groupClauses = groupPatterns.map((_, index) => {
+    const paramName = `pattern${index}`;
+    return [
+      "(",
+      `REGEXP_CONTAINS(title_ja, @${paramName})`,
+      ` OR REGEXP_CONTAINS(abstract_ja, @${paramName})`,
+      ` OR (@searchClaims AND REGEXP_CONTAINS(claims_ja, @${paramName}))`,
+      ")",
+    ].join("");
+  });
 
   const whereClauses = [
     "publication_date >= DATE(@dateFrom)",
     "publication_date <= DATE(@dateTo)",
-    [
-      "(",
-      "REGEXP_CONTAINS(title_ja, @pattern)",
-      " OR REGEXP_CONTAINS(abstract_ja, @pattern)",
-      " OR (@searchClaims AND REGEXP_CONTAINS(claims_ja, @pattern))",
-      ")",
-    ].join(""),
+    ...groupClauses,
   ];
 
   if (conditions.assignee && conditions.assignee.trim() !== "") {

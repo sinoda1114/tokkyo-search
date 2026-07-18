@@ -7,11 +7,12 @@ vi.mock("@/db/client", async () => {
 });
 
 import { db } from "@/db/client";
-import { cases, patents, searchResults, searchRuns } from "@/db/schema";
+import { cases, patents, searchResults, searchRunTerms, searchRuns, searchTerms } from "@/db/schema";
 import {
   getSearchResultsByRun,
   getSearchRunById,
   getSearchRunsByCase,
+  getSearchTermTextsByRun,
 } from "@/features/patent-search/queries";
 
 async function seedCase(caseId: string): Promise<void> {
@@ -178,6 +179,36 @@ describe("getSearchResultsByRun", () => {
 
     const result = await getSearchResultsByRun("run-4");
 
+    expect(result).toEqual([]);
+  });
+});
+
+describe("getSearchTermTextsByRun", () => {
+  it("検索実行に紐づく検索語のテキスト一覧を返す", async () => {
+    await seedCase("case-5");
+    await db.insert(searchTerms).values([
+      { id: "term-1", caseId: "case-5", termType: "original", text: "半導体", source: "user" },
+      { id: "term-2", caseId: "case-5", termType: "synonym", text: "放熱構造", source: "llm" },
+    ]);
+    await db.insert(searchRuns).values({
+      id: "run-5",
+      caseId: "case-5",
+      conditions: { dateFrom: "2000-01-01", dateTo: "2020-01-01", termGroups: [["半導体"], ["放熱構造"]] },
+      status: "success",
+      resultCount: 0,
+    });
+    await db.insert(searchRunTerms).values([
+      { searchRunId: "run-5", searchTermId: "term-1" },
+      { searchRunId: "run-5", searchTermId: "term-2" },
+    ]);
+
+    const result = await getSearchTermTextsByRun("run-5");
+
+    expect(result.sort()).toEqual(["半導体", "放熱構造"]);
+  });
+
+  it("該当する検索実行がない場合は空配列を返す", async () => {
+    const result = await getSearchTermTextsByRun("no-such-run");
     expect(result).toEqual([]);
   });
 });

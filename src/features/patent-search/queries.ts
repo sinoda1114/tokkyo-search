@@ -1,5 +1,5 @@
 import { asc, desc, eq } from "drizzle-orm";
-import { patents, searchResults, searchRuns } from "@/db/schema";
+import { patents, searchResults, searchRunTerms, searchRuns, searchTerms } from "@/db/schema";
 
 export type SearchRunRow = typeof searchRuns.$inferSelect;
 
@@ -56,4 +56,19 @@ export async function getSearchResultsByRun(searchRunId: string): Promise<Search
     .innerJoin(patents, eq(searchResults.patentId, patents.id))
     .where(eq(searchResults.searchRunId, searchRunId))
     .orderBy(asc(searchResults.rank));
+}
+
+/**
+ * 検索実行で実際に使用された検索語のテキスト一覧を取得する。
+ * `search_run_terms` を `search_terms` とJOINして解決する（既存の
+ * `getSearchResultsByRun` と同じJOINパターン）。順序は保証しない。
+ */
+export async function getSearchTermTextsByRun(searchRunId: string): Promise<string[]> {
+  const { db } = await import("@/db/client");
+  const rows = await db
+    .select({ text: searchTerms.text })
+    .from(searchRunTerms)
+    .innerJoin(searchTerms, eq(searchRunTerms.searchTermId, searchTerms.id))
+    .where(eq(searchRunTerms.searchRunId, searchRunId));
+  return rows.map((row) => row.text);
 }
