@@ -10,8 +10,8 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 ## 運用ルール（HOW）の正本
 
-このプロジェクトの開発フロー（worktree / PR / 2 段ゲート / デプロイ規律 / GitHub 正本 / Issue・Project タスク管理 / 供給網デフォルト）は、**本リポの `notes/`** を正本とする（リポと一緒に travel する）。
-同じ挙動規律は `~/.claude` グローバルにも既定として入っているため、自分の端末の全 PJ に自動適用される。
+このプロジェクトの開発フロー（worktree / PR / push 前の 1 段ゲート `/ai-review` / デプロイ規律 / GitHub 正本 / Issue・Project タスク管理 / 供給網デフォルト）の要点は **本リポの `notes/`** にある（リポと一緒に travel する。Codex / Cursor もここを読む）。
+詳細な挙動規律は `~/.claude/CLAUDE.md` グローバルが正本で、自分の端末の全 PJ に自動適用される。notes/ はその要約であり、食い違ったらグローバルを正とする。
 **ここには挙動の再説明を書かない**（重複・ドリフト防止）。このファイルは**このプロジェクト固有の値だけ**を持つ。
 
 - 開発フロー詳細: `notes/dev-workflow-multiagent.md`
@@ -48,4 +48,4 @@ This version has breaking changes — APIs, conventions, and file structure may 
 - ユーザー向けの主要フローには E2E テスト（Playwright 等）を用意し、マージ前に通す。単体・結合テストだけで済ませない。
 - `.env.local` は触らない・中身を出力しない（本番 env は Vercel ダッシュボードが正本）。
 - シークレット（API キー・トークン）はログ / 出力に出さない。必要なら redact する。
-- `JPO_API_USERNAME` / `JPO_API_PASSWORD` は未取得（申請中、発行まで数営業日）。未設定でもビルド・テスト・他機能が壊れない設計にする（`lib/env.ts` で optional 扱い、UI は該当セクションを非表示）。
+- `JPO_API_USERNAME` / `JPO_API_PASSWORD` は未取得（申請中、発行まで数営業日）。未設定でもビルド・テスト・他機能が壊れない設計にする（`src/lib/env.ts` で optional 扱い、UI は該当セクションを非表示）。
